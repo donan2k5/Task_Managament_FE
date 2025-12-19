@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { motion } from 'framer-motion';
-import { ChevronLeft, ChevronRight, Clock, Video, MapPin } from 'lucide-react';
+import { ChevronLeft, ChevronRight, Clock, Video, MoreHorizontal } from 'lucide-react';
 import DashboardLayout from '@/components/layout/DashboardLayout';
 import { upcomingEvents, ScheduleEvent } from '@/data/mockData';
 
@@ -20,12 +20,10 @@ const Schedule = () => {
     const lastDay = new Date(year, month + 1, 0);
     const days = [];
 
-    // Add empty cells for days before the first day of the month
     for (let i = 0; i < firstDay.getDay(); i++) {
       days.push(null);
     }
 
-    // Add days of the month
     for (let i = 1; i <= lastDay.getDate(); i++) {
       days.push(i);
     }
@@ -61,17 +59,17 @@ const Schedule = () => {
 
   return (
     <DashboardLayout>
-      <div className="p-8 max-w-7xl mx-auto">
+      <div className="p-6 max-w-7xl mx-auto">
         <motion.header
           initial={{ opacity: 0, y: -20 }}
           animate={{ opacity: 1, y: 0 }}
-          className="mb-8"
+          className="mb-6"
         >
-          <h1 className="text-3xl font-bold text-foreground mb-1">Schedule</h1>
+          <h1 className="text-2xl font-bold text-foreground mb-1">Schedule</h1>
           <p className="text-muted-foreground">Manage your meetings and events</p>
         </motion.header>
 
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-5">
           {/* Calendar */}
           <motion.div
             initial={{ opacity: 0, y: 20 }}
@@ -80,21 +78,21 @@ const Schedule = () => {
             className="lg:col-span-2 dashboard-card"
           >
             <div className="flex items-center justify-between mb-6">
-              <h2 className="text-xl font-semibold text-foreground">
+              <h2 className="text-lg font-semibold text-foreground">
                 {months[currentDate.getMonth()]} {currentDate.getFullYear()}
               </h2>
-              <div className="flex items-center gap-2">
+              <div className="flex items-center gap-1">
                 <button
                   onClick={prevMonth}
                   className="p-2 rounded-lg hover:bg-muted transition-colors"
                 >
-                  <ChevronLeft className="w-5 h-5 text-muted-foreground" />
+                  <ChevronLeft className="w-4 h-4 text-muted-foreground" />
                 </button>
                 <button
                   onClick={nextMonth}
                   className="p-2 rounded-lg hover:bg-muted transition-colors"
                 >
-                  <ChevronRight className="w-5 h-5 text-muted-foreground" />
+                  <ChevronRight className="w-4 h-4 text-muted-foreground" />
                 </button>
               </div>
             </div>
@@ -103,7 +101,7 @@ const Schedule = () => {
               {daysOfWeek.map((day) => (
                 <div
                   key={day}
-                  className="text-center text-sm font-medium text-muted-foreground py-2"
+                  className="text-center text-xs font-medium text-muted-foreground py-2"
                 >
                   {day}
                 </div>
@@ -115,10 +113,10 @@ const Schedule = () => {
                 <div
                   key={index}
                   className={`
-                    aspect-square flex items-center justify-center rounded-lg text-sm
-                    ${day === null ? '' : 'hover:bg-muted cursor-pointer transition-colors'}
+                    aspect-square flex items-center justify-center rounded-full text-sm cursor-pointer transition-all
+                    ${day === null ? '' : 'hover:bg-muted'}
                     ${isCurrentMonth && day === today.getDate()
-                      ? 'bg-primary text-primary-foreground font-medium'
+                      ? 'calendar-day-active'
                       : 'text-foreground'
                     }
                   `}
@@ -136,29 +134,34 @@ const Schedule = () => {
             transition={{ delay: 0.2 }}
             className="dashboard-card"
           >
-            <h2 className="text-xl font-semibold text-foreground mb-6">Upcoming Events</h2>
+            <h2 className="text-lg font-semibold text-foreground mb-4">Upcoming Events</h2>
 
-            <div className="space-y-6">
+            <div className="space-y-5">
               {Object.entries(groupedEvents).map(([date, events]) => (
                 <div key={date}>
-                  <p className="text-sm font-medium text-muted-foreground mb-3">{date}</p>
-                  <div className="space-y-3">
+                  <p className="text-xs font-medium text-muted-foreground mb-2">{date}</p>
+                  <div className="space-y-2">
                     {events.map((event, index) => (
                       <motion.div
                         key={event.id}
                         initial={{ opacity: 0, x: -10 }}
                         animate={{ opacity: 1, x: 0 }}
                         transition={{ delay: 0.3 + index * 0.05 }}
-                        className="p-3 rounded-lg bg-muted/50 hover:bg-muted transition-colors"
+                        className="p-3 rounded-xl bg-muted/50 hover:bg-muted transition-colors group"
                       >
                         <div className="flex items-start gap-3">
-                          <div className="w-8 h-8 rounded-lg bg-primary/10 flex items-center justify-center flex-shrink-0">
-                            <Video className="w-4 h-4 text-primary" />
+                          <div className="w-8 h-8 rounded-lg bg-violet-light flex items-center justify-center flex-shrink-0">
+                            <Video className="w-4 h-4 text-violet" />
                           </div>
                           <div className="flex-1 min-w-0">
-                            <p className="font-medium text-foreground text-sm truncate">
-                              {event.title}
-                            </p>
+                            <div className="flex items-start justify-between">
+                              <p className="font-medium text-foreground text-sm truncate">
+                                {event.title}
+                              </p>
+                              <button className="p-1 opacity-0 group-hover:opacity-100 hover:bg-card rounded transition-all">
+                                <MoreHorizontal className="w-4 h-4 text-muted-foreground" />
+                              </button>
+                            </div>
                             <div className="flex items-center gap-1 mt-1">
                               <Clock className="w-3 h-3 text-muted-foreground" />
                               <span className="text-xs text-muted-foreground">

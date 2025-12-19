@@ -1,41 +1,47 @@
 import { Link, useLocation } from 'react-router-dom';
-import { Home, CheckSquare, Calendar, FolderKanban, BarChart3, Settings } from 'lucide-react';
-import { currentUser, projects } from '@/data/mockData';
+import { Home, Sparkles, CheckSquare, Inbox, Calendar, BarChart3, Settings, Plus } from 'lucide-react';
+import { currentUser, sidebarProjects } from '@/data/mockData';
 import { cn } from '@/lib/utils';
 
 const navItems = [
   { icon: Home, label: 'Home', path: '/' },
-  { icon: CheckSquare, label: 'Today Tasks', path: '/tasks' },
-  { icon: Calendar, label: 'Schedule', path: '/schedule' },
-  { icon: FolderKanban, label: 'Projects', path: '/projects' },
-  { icon: BarChart3, label: 'Analytics', path: '/analytics' },
+  { icon: Sparkles, label: 'Prodify AI', path: '/ai' },
+  { icon: CheckSquare, label: 'My tasks', path: '/tasks' },
+  { icon: Inbox, label: 'Inbox', path: '/inbox' },
+  { icon: Calendar, label: 'Calendar', path: '/schedule' },
+  { icon: BarChart3, label: 'Reports & Analytics', path: '/analytics' },
 ];
 
 const AppSidebar = () => {
   const location = useLocation();
 
   return (
-    <aside className="w-64 h-screen bg-sidebar border-r border-sidebar-border flex flex-col sticky top-0">
+    <aside className="w-56 h-screen bg-sidebar border-r border-sidebar-border flex flex-col sticky top-0">
       {/* User Profile */}
-      <div className="p-5 border-b border-sidebar-border">
+      <div className="p-4 border-b border-sidebar-border">
         <div className="flex items-center gap-3">
           <div className="relative">
             <img
               src={currentUser.avatar}
               alt={currentUser.name}
-              className="w-10 h-10 rounded-full object-cover"
+              className="w-9 h-9 rounded-full object-cover"
             />
-            <span className="absolute bottom-0 right-0 w-3 h-3 bg-primary rounded-full border-2 border-sidebar" />
+            <span className="absolute bottom-0 right-0 w-2.5 h-2.5 bg-green rounded-full border-2 border-sidebar" />
           </div>
-          <div>
-            <p className="font-medium text-foreground">{currentUser.name}</p>
+          <div className="flex-1 min-w-0">
+            <p className="font-medium text-sm text-foreground truncate">{currentUser.name}</p>
             <p className="text-xs text-muted-foreground capitalize">{currentUser.status}</p>
           </div>
+          <button className="text-muted-foreground hover:text-foreground">
+            <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+            </svg>
+          </button>
         </div>
       </div>
 
       {/* Navigation */}
-      <nav className="flex-1 p-3 space-y-1">
+      <nav className="flex-1 p-3 space-y-0.5 overflow-y-auto">
         {navItems.map((item) => {
           const isActive = location.pathname === item.path;
           return (
@@ -44,46 +50,63 @@ const AppSidebar = () => {
               to={item.path}
               className={cn('nav-item', isActive && 'active')}
             >
-              <item.icon className="w-5 h-5" />
+              <item.icon className="w-4 h-4" />
               <span>{item.label}</span>
             </Link>
           );
         })}
-      </nav>
 
-      {/* Projects */}
-      <div className="px-3 pb-3">
-        <div className="flex items-center justify-between px-3 mb-2">
-          <span className="text-xs font-medium text-muted-foreground uppercase tracking-wider">
-            My Projects
-          </span>
-          <button className="text-xs text-primary font-medium hover:underline">
-            + Add
-          </button>
+        {/* My Projects Section */}
+        <div className="pt-6">
+          <div className="flex items-center justify-between px-3 mb-2">
+            <span className="text-xs font-medium text-muted-foreground">
+              My Projects
+            </span>
+            <button className="text-xs text-accent font-medium hover:underline flex items-center gap-1">
+              <Plus className="w-3 h-3" />
+              Add
+            </button>
+          </div>
+          <div className="space-y-0.5">
+            {sidebarProjects.map((project) => (
+              <Link
+                key={project.id}
+                to="/projects"
+                className="nav-item py-2"
+              >
+                <span
+                  className="w-2 h-2 rounded-sm flex-shrink-0"
+                  style={{ backgroundColor: project.color }}
+                />
+                <span className="text-sm truncate">{project.name}</span>
+              </Link>
+            ))}
+          </div>
         </div>
-        <div className="space-y-1">
-          {projects.slice(0, 3).map((project) => (
-            <Link
-              key={project.id}
-              to={`/projects`}
-              className="nav-item py-2"
-            >
-              <span
-                className="w-2 h-2 rounded-full flex-shrink-0"
-                style={{ backgroundColor: project.color }}
-              />
-              <span className="text-sm truncate">{project.name}</span>
-            </Link>
-          ))}
-        </div>
-      </div>
+      </nav>
 
       {/* Settings */}
       <div className="p-3 border-t border-sidebar-border">
         <Link to="/settings" className="nav-item">
-          <Settings className="w-5 h-5" />
+          <Settings className="w-4 h-4" />
           <span>Settings</span>
         </Link>
+      </div>
+
+      {/* Promo Card */}
+      <div className="p-3">
+        <div className="promo-card">
+          <div className="flex items-center gap-1 mb-2">
+            <Sparkles className="w-3 h-3" />
+            <span className="text-xs font-bold">prodify</span>
+          </div>
+          <p className="text-xs opacity-90 mb-3 leading-relaxed">
+            New members will gain access to public Spaces, Docs and Dashboards
+          </p>
+          <button className="w-full py-1.5 px-3 bg-card/20 hover:bg-card/30 rounded-lg text-xs font-medium transition-colors">
+            + Invite people
+          </button>
+        </div>
       </div>
     </aside>
   );
