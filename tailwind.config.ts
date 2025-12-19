@@ -60,13 +60,45 @@ export default {
           border: "hsl(var(--sidebar-border))",
           ring: "hsl(var(--sidebar-ring))",
         },
+        violet: {
+          DEFAULT: "hsl(var(--violet))",
+          light: "hsl(var(--violet-light))",
+        },
+        cyan: {
+          DEFAULT: "hsl(var(--cyan))",
+          light: "hsl(var(--cyan-light))",
+        },
+        orange: {
+          DEFAULT: "hsl(var(--orange))",
+          light: "hsl(var(--orange-light))",
+        },
+        blue: {
+          DEFAULT: "hsl(var(--blue))",
+          light: "hsl(var(--blue-light))",
+        },
+        pink: {
+          DEFAULT: "hsl(var(--pink))",
+          light: "hsl(var(--pink-light))",
+        },
+        green: {
+          DEFAULT: "hsl(var(--green))",
+          light: "hsl(var(--green-light))",
+        },
         priority: {
           high: "hsl(var(--priority-high))",
-          "high-foreground": "hsl(var(--priority-high-foreground))",
+          "high-bg": "hsl(var(--priority-high-bg))",
           medium: "hsl(var(--priority-medium))",
-          "medium-foreground": "hsl(var(--priority-medium-foreground))",
+          "medium-bg": "hsl(var(--priority-medium-bg))",
           low: "hsl(var(--priority-low))",
-          "low-foreground": "hsl(var(--priority-low-foreground))",
+          "low-bg": "hsl(var(--priority-low-bg))",
+        },
+        status: {
+          progress: "hsl(var(--status-progress))",
+          "progress-bg": "hsl(var(--status-progress-bg))",
+          todo: "hsl(var(--status-todo))",
+          "todo-bg": "hsl(var(--status-todo-bg))",
+          upcoming: "hsl(var(--status-upcoming))",
+          "upcoming-bg": "hsl(var(--status-upcoming-bg))",
         },
         chart: {
           "1": "hsl(var(--chart-1))",
@@ -85,6 +117,7 @@ export default {
         'sm': 'var(--shadow-sm)',
         'md': 'var(--shadow-md)',
         'lg': 'var(--shadow-lg)',
+        'card': 'var(--shadow-card)',
         'card-hover': 'var(--shadow-card-hover)',
       },
       keyframes: {
@@ -108,10 +141,6 @@ export default {
           from: { opacity: "0", transform: "scale(0.95)" },
           to: { opacity: "1", transform: "scale(1)" },
         },
-        "progress-fill": {
-          from: { width: "0%" },
-          to: { width: "var(--progress-width)" },
-        },
       },
       animation: {
         "accordion-down": "accordion-down 0.2s ease-out",
@@ -119,7 +148,6 @@ export default {
         "fade-in": "fade-in 0.4s ease-out forwards",
         "slide-up": "slide-up 0.5s ease-out forwards",
         "scale-in": "scale-in 0.3s ease-out forwards",
-        "progress-fill": "progress-fill 1s ease-out forwards",
       },
     },
   },

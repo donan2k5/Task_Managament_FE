@@ -6,13 +6,13 @@ import { projects as projectsData, Project } from '@/data/mockData';
 import { Button } from '@/components/ui/button';
 
 const Projects = () => {
-  const [projects, setProjects] = useState<(Project & { animatedProgress: number })[]>(
+  const [projectList, setProjectList] = useState<(Project & { animatedProgress: number })[]>(
     projectsData.map((p) => ({ ...p, animatedProgress: 0 }))
   );
 
   useEffect(() => {
     const timer = setTimeout(() => {
-      setProjects((prev) =>
+      setProjectList((prev) =>
         prev.map((p) => ({ ...p, animatedProgress: p.progress }))
       );
     }, 300);
@@ -38,7 +38,7 @@ const Projects = () => {
         </motion.header>
 
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-          {projects.map((project, index) => (
+          {projectList.map((project, index) => (
             <motion.div
               key={project.id}
               initial={{ opacity: 0, y: 20 }}
@@ -49,14 +49,14 @@ const Projects = () => {
               <div className="flex items-start justify-between mb-4">
                 <div className="flex items-start gap-3">
                   <div
-                    className="w-10 h-10 rounded-xl flex items-center justify-center text-xl font-bold"
-                    style={{ backgroundColor: `${project.color}20`, color: project.color }}
+                    className="project-icon text-xl"
+                    style={{ backgroundColor: `${project.color}20` }}
                   >
-                    {project.name.charAt(0)}
+                    {project.icon}
                   </div>
                   <div>
                     <h3 className="font-semibold text-foreground">{project.name}</h3>
-                    <p className="text-sm text-muted-foreground">{project.description}</p>
+                    <p className="text-sm text-muted-foreground">{project.teammates} teammates</p>
                   </div>
                 </div>
                 <button className="p-1 rounded-lg opacity-0 group-hover:opacity-100 hover:bg-muted transition-all">
@@ -76,7 +76,7 @@ const Projects = () => {
                   </div>
                 </div>
 
-                <div className="progress-bar h-3">
+                <div className="progress-bar h-2">
                   <div
                     className="h-full rounded-full transition-all duration-1000 ease-out"
                     style={{
@@ -87,7 +87,6 @@ const Projects = () => {
                 </div>
               </div>
 
-              {/* Quick Stats */}
               <div className="mt-4 pt-4 border-t border-border">
                 <div className="flex items-center justify-between text-sm">
                   <span className="text-muted-foreground">
@@ -101,11 +100,10 @@ const Projects = () => {
             </motion.div>
           ))}
 
-          {/* Add New Project Card */}
           <motion.div
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
-            transition={{ delay: projects.length * 0.1, duration: 0.4 }}
+            transition={{ delay: projectList.length * 0.1, duration: 0.4 }}
             className="border-2 border-dashed border-border rounded-xl p-6 flex flex-col items-center justify-center min-h-[200px] cursor-pointer hover:border-primary/50 hover:bg-muted/30 transition-all"
           >
             <div className="w-12 h-12 rounded-full bg-muted flex items-center justify-center mb-3">

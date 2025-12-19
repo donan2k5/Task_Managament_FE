@@ -4,6 +4,7 @@ export interface Task {
   priority: 'high' | 'medium' | 'low';
   completed: boolean;
   dueDate: string;
+  status: 'in-progress' | 'todo' | 'upcoming';
 }
 
 export interface Project {
@@ -12,7 +13,18 @@ export interface Project {
   description: string;
   progress: number;
   color: string;
+  icon: string;
   tasksCount: number;
+  teammates: number;
+}
+
+export interface Goal {
+  id: string;
+  name: string;
+  project: string;
+  category: string;
+  progress: number;
+  color: string;
 }
 
 export interface ScheduleEvent {
@@ -22,6 +34,8 @@ export interface ScheduleEvent {
   endTime: string;
   date: string;
   type: 'meeting' | 'task' | 'reminder';
+  platform?: string;
+  attendees?: number;
 }
 
 export interface WeeklyStats {
@@ -31,42 +45,34 @@ export interface WeeklyStats {
 }
 
 export const currentUser = {
-  name: 'Alex Mitchell',
-  avatar: 'https://images.unsplash.com/photo-1472099645785-5658abf4ff4e?w=100&h=100&fit=crop&crop=face',
+  name: 'Courtney Henry',
+  avatar: 'https://images.unsplash.com/photo-1494790108377-be9c29b29330?w=100&h=100&fit=crop&crop=face',
   status: 'online' as const,
 };
 
-export const todayTasks: Task[] = [
-  { id: '1', name: 'Review product roadmap', priority: 'high', completed: false, dueDate: 'Today' },
-  { id: '2', name: 'Team sync meeting prep', priority: 'high', completed: false, dueDate: 'Today' },
-  { id: '3', name: 'Update API documentation', priority: 'medium', completed: true, dueDate: 'Today' },
-  { id: '4', name: 'Code review for PR #142', priority: 'medium', completed: false, dueDate: 'Today' },
-  { id: '5', name: 'Send weekly status report', priority: 'low', completed: false, dueDate: 'Today' },
-];
-
-export const allTasks: Task[] = [
-  ...todayTasks,
-  { id: '6', name: 'Design system audit', priority: 'medium', completed: false, dueDate: 'Tomorrow' },
-  { id: '7', name: 'User interview prep', priority: 'high', completed: false, dueDate: 'Tomorrow' },
-  { id: '8', name: 'Database optimization', priority: 'low', completed: false, dueDate: 'Dec 21' },
-  { id: '9', name: 'Q4 planning session', priority: 'high', completed: false, dueDate: 'Dec 22' },
-  { id: '10', name: 'Security patch deployment', priority: 'high', completed: false, dueDate: 'Dec 23' },
+export const tasks: Task[] = [
+  { id: '1', name: 'One-on-One Meeting', priority: 'high', completed: false, dueDate: 'Today', status: 'in-progress' },
+  { id: '2', name: 'Send a summary email to stakeholders', priority: 'low', completed: false, dueDate: '3 days left', status: 'in-progress' },
+  { id: '3', name: 'Review product roadmap', priority: 'medium', completed: false, dueDate: 'Today', status: 'todo' },
+  { id: '4', name: 'Team sync meeting prep', priority: 'high', completed: false, dueDate: 'Tomorrow', status: 'upcoming' },
 ];
 
 export const projects: Project[] = [
-  { id: '1', name: 'Product Launch', description: 'Q1 2024 release preparation', progress: 73, color: 'hsl(174 60% 45%)', tasksCount: 12 },
-  { id: '2', name: 'API Integration', description: 'Third-party service connections', progress: 45, color: 'hsl(38 90% 55%)', tasksCount: 8 },
-  { id: '3', name: 'Mobile App', description: 'React Native development', progress: 28, color: 'hsl(262 60% 55%)', tasksCount: 15 },
-  { id: '4', name: 'Documentation', description: 'Developer docs & guides', progress: 91, color: 'hsl(152 55% 45%)', tasksCount: 5 },
+  { id: '1', name: 'Product launch', description: '', progress: 73, color: 'hsl(330 80% 60%)', icon: '🚀', tasksCount: 6, teammates: 12 },
+  { id: '2', name: 'Team brainstorm', description: '', progress: 45, color: 'hsl(220 90% 55%)', icon: '💡', tasksCount: 2, teammates: 32 },
+  { id: '3', name: 'Branding launch', description: '', progress: 28, color: 'hsl(174 70% 45%)', icon: '🎨', tasksCount: 4, teammates: 8 },
+];
+
+export const goals: Goal[] = [
+  { id: '1', name: 'Check Emails and Messages', project: 'Product launch', category: 'My Projects', progress: 73, color: 'hsl(174 70% 45%)' },
+  { id: '2', name: 'Prepare a brief status update to the client', project: 'Product launch', category: 'My Projects', progress: 11, color: 'hsl(25 95% 55%)' },
+  { id: '3', name: 'Update project documentation', project: 'Team brainstorm', category: 'My Projects', progress: 63, color: 'hsl(174 70% 45%)' },
 ];
 
 export const upcomingEvents: ScheduleEvent[] = [
-  { id: '1', title: 'Team Standup', startTime: '09:00', endTime: '09:30', date: 'Today', type: 'meeting' },
-  { id: '2', title: 'Product Review', startTime: '14:00', endTime: '15:00', date: 'Today', type: 'meeting' },
-  { id: '3', title: '1:1 with Manager', startTime: '10:00', endTime: '10:30', date: 'Tomorrow', type: 'meeting' },
-  { id: '4', title: 'Sprint Planning', startTime: '13:00', endTime: '14:30', date: 'Dec 20', type: 'meeting' },
-  { id: '5', title: 'Design Review', startTime: '15:00', endTime: '16:00', date: 'Dec 20', type: 'meeting' },
-  { id: '6', title: 'Client Call', startTime: '11:00', endTime: '12:00', date: 'Dec 21', type: 'meeting' },
+  { id: '1', title: 'Meeting with VP', startTime: '10:00', endTime: '11:00 am', date: 'Today', type: 'meeting', platform: 'Google Meet', attendees: 4 },
+  { id: '2', title: 'Sprint Planning', startTime: '13:00', endTime: '14:30', date: 'Tomorrow', type: 'meeting' },
+  { id: '3', title: 'Design Review', startTime: '15:00', endTime: '16:00', date: 'Dec 20', type: 'meeting' },
 ];
 
 export const weeklyStats: WeeklyStats[] = [
@@ -79,12 +85,32 @@ export const weeklyStats: WeeklyStats[] = [
   { day: 'Sun', hours: 1.0, dayName: 'Sunday' },
 ];
 
+export const calendarDays = [
+  { day: 4, name: 'Fri' },
+  { day: 5, name: 'Sat' },
+  { day: 6, name: 'Sun' },
+  { day: 7, name: 'Mon', isToday: true },
+  { day: 8, name: 'Tue' },
+  { day: 9, name: 'Wed' },
+  { day: 10, name: 'Thu' },
+];
+
+export const reminders = [
+  { id: '1', text: 'Assess any new risks identified in the morning meeting.' },
+  { id: '2', text: "Outline key points for tomorrow's stand-up meeting." },
+];
+
+export const sidebarProjects = [
+  { id: '1', name: 'Product launch', color: 'hsl(330 80% 60%)' },
+  { id: '2', name: 'Team brainstorm', color: 'hsl(220 90% 55%)' },
+  { id: '3', name: 'Branding launch', color: 'hsl(174 70% 45%)' },
+];
+
 export const getTotalWeeklyHours = () => {
   return weeklyStats.reduce((sum, day) => sum + day.hours, 0).toFixed(1);
 };
 
 export const getCurrentDayIndex = () => {
   const today = new Date().getDay();
-  // Convert to Mon=0, Tue=1, etc. (Sunday becomes 6)
   return today === 0 ? 6 : today - 1;
 };
