@@ -1,4 +1,4 @@
-@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap');
+@import url("https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap");
 
 @tailwind base;
 @tailwind components;
@@ -6,9 +6,15 @@
 
 @layer base {
   :root {
-    --background: 240 20% 98%;
+    /* --- THAY ĐỔI QUAN TRỌNG NHẤT Ở ĐÂY --- */
+    /* Màu nền: Xanh nước biển pha xám cực nhạt (Cool Slate) */
+    /* Giúp Card trắng nổi lên mà không bị chói */
+    --background: 210 40% 96.1%;
+    /* -------------------------------------- */
+
     --foreground: 240 10% 10%;
 
+    /* Card giữ nguyên màu trắng tinh để tương phản với nền xanh nhạt */
     --card: 0 0% 100%;
     --card-foreground: 240 10% 10%;
 
@@ -36,7 +42,17 @@
 
     --radius: 0.75rem;
 
-    /* Vibrant color palette */
+    /* Sidebar: Giữ màu trắng để nó tách biệt với cái nền xanh nhạt của Body */
+    --sidebar-background: 0 0% 100%;
+    --sidebar-foreground: 240 10% 35%;
+    --sidebar-primary: 262 80% 55%;
+    --sidebar-primary-foreground: 0 0% 100%;
+    --sidebar-accent: 262 60% 96%;
+    --sidebar-accent-foreground: 262 80% 45%;
+    --sidebar-border: 240 10% 92%;
+    --sidebar-ring: 262 80% 55%;
+
+    /* Vibrant color palette & Gradients (Giữ nguyên) */
     --violet: 262 80% 55%;
     --violet-light: 262 70% 95%;
     --cyan: 174 70% 45%;
@@ -66,26 +82,30 @@
     --status-upcoming: 262 80% 55%;
     --status-upcoming-bg: 262 70% 95%;
 
-    /* Sidebar */
-    --sidebar-background: 0 0% 100%;
-    --sidebar-foreground: 240 10% 35%;
-    --sidebar-primary: 262 80% 55%;
-    --sidebar-primary-foreground: 0 0% 100%;
-    --sidebar-accent: 262 60% 96%;
-    --sidebar-accent-foreground: 262 80% 45%;
-    --sidebar-border: 240 10% 92%;
-    --sidebar-ring: 262 80% 55%;
-
     /* Gradients */
-    --gradient-primary: linear-gradient(135deg, hsl(262 80% 55%), hsl(280 70% 60%));
-    --gradient-cyan: linear-gradient(135deg, hsl(174 70% 45%), hsl(180 65% 55%));
-    --gradient-violet-card: linear-gradient(145deg, hsl(262 75% 58%), hsl(280 80% 50%));
+    --gradient-primary: linear-gradient(
+      135deg,
+      hsl(262 80% 55%),
+      hsl(280 70% 60%)
+    );
+    --gradient-cyan: linear-gradient(
+      135deg,
+      hsl(174 70% 45%),
+      hsl(180 65% 55%)
+    );
+    --gradient-violet-card: linear-gradient(
+      145deg,
+      hsl(262 75% 58%),
+      hsl(280 80% 50%)
+    );
     --gradient-text: linear-gradient(90deg, hsl(174 70% 45%), hsl(180 65% 55%));
 
-    /* Shadows */
+    /* Shadows (Giữ nguyên để tạo độ nổi cho Card) */
     --shadow-sm: 0 1px 2px 0 hsl(240 10% 15% / 0.04);
-    --shadow-md: 0 4px 12px -2px hsl(240 10% 15% / 0.06), 0 2px 6px -2px hsl(240 10% 15% / 0.04);
-    --shadow-lg: 0 12px 24px -4px hsl(240 10% 15% / 0.08), 0 6px 12px -6px hsl(240 10% 15% / 0.04);
+    --shadow-md: 0 4px 12px -2px hsl(240 10% 15% / 0.06),
+      0 2px 6px -2px hsl(240 10% 15% / 0.04);
+    --shadow-lg: 0 12px 24px -4px hsl(240 10% 15% / 0.08),
+      0 6px 12px -6px hsl(240 10% 15% / 0.04);
     --shadow-card: 0 2px 8px -2px hsl(240 10% 15% / 0.06);
     --shadow-card-hover: 0 8px 24px -4px hsl(240 10% 15% / 0.1);
 
@@ -144,10 +164,15 @@
 
   body {
     @apply bg-background text-foreground font-sans antialiased;
-    font-family: 'Inter', system-ui, sans-serif;
+    font-family: "Inter", system-ui, sans-serif;
   }
 
-  h1, h2, h3, h4, h5, h6 {
+  h1,
+  h2,
+  h3,
+  h4,
+  h5,
+  h6 {
     @apply font-semibold tracking-tight;
   }
 }
@@ -173,20 +198,18 @@
     background: var(--gradient-violet-card);
   }
 
+  /* ... Các class tiện ích khác giữ nguyên ... */
   .status-badge {
     @apply inline-flex items-center px-3 py-1 rounded-full text-xs font-semibold;
   }
-
   .status-progress {
     background: hsl(var(--status-progress-bg));
     color: hsl(var(--status-progress));
   }
-
   .status-todo {
     background: hsl(var(--status-todo-bg));
     color: hsl(var(--status-todo));
   }
-
   .status-upcoming {
     background: hsl(var(--status-upcoming-bg));
     color: hsl(var(--status-upcoming));
@@ -195,17 +218,14 @@
   .priority-badge {
     @apply inline-flex items-center px-2.5 py-0.5 rounded-md text-xs font-medium;
   }
-
   .priority-high {
     background: hsl(var(--priority-high-bg));
     color: hsl(var(--priority-high));
   }
-
   .priority-medium {
     background: hsl(var(--priority-medium-bg));
     color: hsl(var(--priority-medium));
   }
-
   .priority-low {
     background: hsl(var(--priority-low-bg));
     color: hsl(var(--priority-low));
@@ -214,11 +234,9 @@
   .nav-item {
     @apply flex items-center gap-3 px-3 py-2.5 rounded-lg text-sidebar-foreground transition-all duration-200 text-sm;
   }
-
   .nav-item:hover {
     @apply bg-sidebar-accent text-sidebar-accent-foreground;
   }
-
   .nav-item.active {
     @apply bg-sidebar-accent text-primary font-medium;
   }
@@ -226,7 +244,6 @@
   .progress-bar {
     @apply h-1.5 rounded-full bg-muted overflow-hidden;
   }
-
   .progress-bar-fill {
     @apply h-full rounded-full transition-all duration-1000 ease-out;
   }
@@ -234,12 +251,10 @@
   .action-chip {
     @apply inline-flex items-center gap-2 px-4 py-2 rounded-full text-sm font-medium transition-all duration-200 border;
   }
-
   .action-chip-primary {
     background: var(--gradient-primary);
     @apply text-primary-foreground border-transparent hover:opacity-90;
   }
-
   .action-chip-outline {
     @apply bg-card text-foreground border-border hover:bg-muted;
   }
@@ -251,12 +266,10 @@
   .calendar-day {
     @apply w-10 h-10 rounded-full flex items-center justify-center text-sm font-medium transition-all duration-200;
   }
-
   .calendar-day-active {
     background: var(--gradient-primary);
     @apply text-primary-foreground;
   }
-
   .calendar-day-inactive {
     @apply text-muted-foreground hover:bg-muted cursor-pointer;
   }
@@ -265,42 +278,65 @@
     background: var(--gradient-violet-card);
     @apply rounded-xl p-4 text-primary-foreground;
   }
+
+  /* Ẩn scrollbar */
+  .no-scrollbar::-webkit-scrollbar {
+    display: none;
+  }
+  .no-scrollbar {
+    -ms-overflow-style: none;
+    scrollbar-width: none;
+  }
 }
 
 @layer utilities {
   .text-balance {
     text-wrap: balance;
   }
-
   .animate-fade-in {
     animation: fadeIn 0.4s ease-out forwards;
   }
-
   .animate-slide-up {
     animation: slideUp 0.5s ease-out forwards;
   }
-
   .animate-scale-in {
     animation: scaleIn 0.3s ease-out forwards;
   }
 
   @keyframes fadeIn {
-    from { opacity: 0; }
-    to { opacity: 1; }
+    from {
+      opacity: 0;
+    }
+    to {
+      opacity: 1;
+    }
   }
-
   @keyframes slideUp {
-    from { opacity: 0; transform: translateY(20px); }
-    to { opacity: 1; transform: translateY(0); }
+    from {
+      opacity: 0;
+      transform: translateY(20px);
+    }
+    to {
+      opacity: 1;
+      transform: translateY(0);
+    }
   }
-
   @keyframes scaleIn {
-    from { opacity: 0; transform: scale(0.95); }
-    to { opacity: 1; transform: scale(1); }
+    from {
+      opacity: 0;
+      transform: scale(0.95);
+    }
+    to {
+      opacity: 1;
+      transform: scale(1);
+    }
   }
-
   @keyframes progressFill {
-    from { width: 0; }
-    to { width: var(--progress-width); }
+    from {
+      width: 0;
+    }
+    to {
+      width: var(--progress-width);
+    }
   }
 }

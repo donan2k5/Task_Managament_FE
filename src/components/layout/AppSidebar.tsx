@@ -1,15 +1,22 @@
-import { Link, useLocation } from 'react-router-dom';
-import { Home, Sparkles, CheckSquare, Inbox, Calendar, BarChart3, Settings, Plus } from 'lucide-react';
-import { currentUser, sidebarProjects } from '@/data/mockData';
-import { cn } from '@/lib/utils';
+import { Link, useLocation } from "react-router-dom";
+import {
+  Home,
+  Sparkles,
+  CheckSquare,
+  Inbox,
+  Calendar,
+  BarChart3,
+  Settings,
+  Plus,
+} from "lucide-react";
+import { currentUser } from "@/data/mockData";
+import { cn } from "@/lib/utils";
 
 const navItems = [
-  { icon: Home, label: 'Home', path: '/' },
-  { icon: Sparkles, label: 'Prodify AI', path: '/ai' },
-  { icon: CheckSquare, label: 'My tasks', path: '/tasks' },
-  { icon: Inbox, label: 'Inbox', path: '/inbox' },
-  { icon: Calendar, label: 'Calendar', path: '/schedule' },
-  { icon: BarChart3, label: 'Reports & Analytics', path: '/analytics' },
+  { icon: Home, label: "Home", path: "/" },
+  { icon: CheckSquare, label: "My tasks", path: "/tasks" },
+  { icon: Calendar, label: "Calendar", path: "/calendar" },
+  { icon: BarChart3, label: "Reports & Analytics", path: "/analytics" },
 ];
 
 const AppSidebar = () => {
@@ -29,12 +36,26 @@ const AppSidebar = () => {
             <span className="absolute bottom-0 right-0 w-2.5 h-2.5 bg-green rounded-full border-2 border-sidebar" />
           </div>
           <div className="flex-1 min-w-0">
-            <p className="font-medium text-sm text-foreground truncate">{currentUser.name}</p>
-            <p className="text-xs text-muted-foreground capitalize">{currentUser.status}</p>
+            <p className="font-medium text-sm text-foreground truncate">
+              {currentUser.name}
+            </p>
+            <p className="text-xs text-muted-foreground capitalize">
+              {currentUser.status}
+            </p>
           </div>
           <button className="text-muted-foreground hover:text-foreground">
-            <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+            <svg
+              className="w-4 h-4"
+              fill="none"
+              viewBox="0 0 24 24"
+              stroke="currentColor"
+            >
+              <path
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                strokeWidth={2}
+                d="M19 9l-7 7-7-7"
+              />
             </svg>
           </button>
         </div>
@@ -48,7 +69,7 @@ const AppSidebar = () => {
             <Link
               key={item.path}
               to={item.path}
-              className={cn('nav-item', isActive && 'active')}
+              className={cn("nav-item", isActive && "active")}
             >
               <item.icon className="w-4 h-4" />
               <span>{item.label}</span>
@@ -67,21 +88,6 @@ const AppSidebar = () => {
               Add
             </button>
           </div>
-          <div className="space-y-0.5">
-            {sidebarProjects.map((project) => (
-              <Link
-                key={project.id}
-                to="/projects"
-                className="nav-item py-2"
-              >
-                <span
-                  className="w-2 h-2 rounded-sm flex-shrink-0"
-                  style={{ backgroundColor: project.color }}
-                />
-                <span className="text-sm truncate">{project.name}</span>
-              </Link>
-            ))}
-          </div>
         </div>
       </nav>
 
@@ -91,22 +97,6 @@ const AppSidebar = () => {
           <Settings className="w-4 h-4" />
           <span>Settings</span>
         </Link>
-      </div>
-
-      {/* Promo Card */}
-      <div className="p-3">
-        <div className="promo-card">
-          <div className="flex items-center gap-1 mb-2">
-            <Sparkles className="w-3 h-3" />
-            <span className="text-xs font-bold">prodify</span>
-          </div>
-          <p className="text-xs opacity-90 mb-3 leading-relaxed">
-            New members will gain access to public Spaces, Docs and Dashboards
-          </p>
-          <button className="w-full py-1.5 px-3 bg-card/20 hover:bg-card/30 rounded-lg text-xs font-medium transition-colors">
-            + Invite people
-          </button>
-        </div>
       </div>
     </aside>
   );
