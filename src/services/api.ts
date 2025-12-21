@@ -1,7 +1,7 @@
 import axios from "axios";
 
 const api = axios.create({
-  baseURL: "http://localhost:3000", // Đổi port theo backend của bạn
+  baseURL: "https://be-time-management-751785253442.europe-west1.run.app/", // Đổi port theo backend của bạn
   headers: {
     "Content-Type": "application/json",
   },
