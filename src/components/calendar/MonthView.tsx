@@ -1,3 +1,4 @@
+import { useMemo } from "react";
 import {
   format,
   startOfMonth,
@@ -71,8 +72,8 @@ export const MonthView = ({
               <div className="flex justify-between items-start">
                 <span
                   className={cn(
-                    "text-sm font-semibold w-7 h-7 flex items-center justify-center rounded-full",
-                    isToday(day) ? "bg-violet-600 text-white" : "text-slate-700"
+                    "text-sm font-semibold w-7 h-7 flex items-center justify-center rounded-full transition-colors",
+                    isToday(day) ? "bg-blue-600 text-white shadow-sm" : "text-slate-700 hover:bg-slate-100"
                   )}
                 >
                   {format(day, "d")}
@@ -91,12 +92,15 @@ export const MonthView = ({
                     key={task._id}
                     onClick={() => onTaskClick(task)}
                     className={cn(
-                      "text-left text-[10px] px-1.5 py-1 rounded truncate font-medium border-l-2 transition-all hover:brightness-95",
-                      task.isUrgent
-                        ? "bg-rose-50 text-rose-700 border-rose-500"
+                      "text-left text-[10px] px-2 py-1 rounded-md truncate font-medium border-l-2 transition-all hover:shadow-sm",
+                      // Updated professional color palette
+                      task.isUrgent && task.isImportant
+                        ? "bg-red-50 text-red-700 border-red-400 hover:bg-red-100"
                         : task.isImportant
-                        ? "bg-indigo-50 text-indigo-700 border-indigo-500"
-                        : "bg-slate-100 text-slate-600 border-slate-400"
+                        ? "bg-blue-50 text-blue-700 border-blue-400 hover:bg-blue-100"
+                        : task.isUrgent
+                        ? "bg-amber-50 text-amber-700 border-amber-400 hover:bg-amber-100"
+                        : "bg-slate-100 text-slate-600 border-slate-300 hover:bg-slate-200"
                     )}
                   >
                     <span className="opacity-70 mr-1">

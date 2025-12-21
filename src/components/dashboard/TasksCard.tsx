@@ -1,4 +1,4 @@
-import { useState, useMemo } from "react";
+import { useState, useMemo, forwardRef } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { MoreHorizontal, Clock, CheckCircle2, Circle } from "lucide-react";
 import { Task } from "@/types/index";
@@ -11,7 +11,7 @@ export const TasksCard = ({ tasks: initialTasks }: TasksCardProps) => {
   const [localTasks, setLocalTasks] = useState<Task[]>(initialTasks);
 
   // Logic lọc và phân loại task
-  const { todoTasks, doneTasks } = useMemo(() => {
+  const { todoTasks, todayAccomplished } = useMemo(() => {
     const todayStr = new Date().toDateString();
 
     const todo = localTasks.filter((t) => {
@@ -23,9 +23,21 @@ export const TasksCard = ({ tasks: initialTasks }: TasksCardProps) => {
       return isCritical || isToday;
     });
 
-    const done = localTasks.filter((t) => t.completed);
+    // Today's accomplishments: completed tasks that were either:
+    // 1. Scheduled for today, or
+    // 2. Updated today (likely completed today)
+    const accomplished = localTasks.filter((t) => {
+      if (!t.completed) return false;
+      const scheduledToday = t.scheduledDate
+        ? new Date(t.scheduledDate).toDateString() === todayStr
+        : false;
+      const updatedToday = t.updatedAt
+        ? new Date(t.updatedAt).toDateString() === todayStr
+        : false;
+      return scheduledToday || updatedToday;
+    });
 
-    return { todoTasks: todo, doneTasks: done };
+    return { todoTasks: todo, todayAccomplished: accomplished };
   }, [localTasks]);
 
   const toggleTask = (taskId: string) => {
@@ -74,14 +86,25 @@ export const TasksCard = ({ tasks: initialTasks }: TasksCardProps) => {
         </AnimatePresence>
       </div>
 
-      {/* DONE LIST */}
-      {doneTasks.length > 0 && (
-        <div className="border-t border-slate-50 pt-4 mt-2">
-          <div className="flex flex-col gap-2 opacity-50">
-            {doneTasks.map((task) => (
-              <div key={task._id} className="flex items-center gap-3 px-2 py-1">
-                <CheckCircle2 size={16} className="text-emerald-500" />
-                <span className="text-sm text-slate-500 line-through truncate">
+      {/* TODAY'S ACCOMPLISHMENTS */}
+      {todayAccomplished.length > 0 && (
+        <div className="border-t border-slate-100 pt-4 mt-2">
+          <div className="flex items-center gap-2 mb-3">
+            <h4 className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">
+              Accomplished Today
+            </h4>
+            <span className="bg-emerald-50 text-emerald-600 text-[10px] font-bold px-1.5 py-0.5 rounded-full">
+              {todayAccomplished.length}
+            </span>
+          </div>
+          <div className="flex flex-col gap-2">
+            {todayAccomplished.map((task) => (
+              <div
+                key={task._id}
+                className="flex items-center gap-3 px-2 py-1.5 rounded-lg bg-emerald-50/50"
+              >
+                <CheckCircle2 size={16} className="text-emerald-500 shrink-0" />
+                <span className="text-sm text-slate-600 truncate">
                   {task.title}
                 </span>
               </div>
@@ -95,55 +118,60 @@ export const TasksCard = ({ tasks: initialTasks }: TasksCardProps) => {
 
 // --- Sub-components ---
 
-const TaskItem = ({ task, onToggle }: { task: Task; onToggle: () => void }) => {
-  const isCritical = task.isUrgent && task.isImportant;
+const TaskItem = forwardRef<HTMLDivElement, { task: Task; onToggle: () => void }>(
+  ({ task, onToggle }, ref) => {
+    const isCritical = task.isUrgent && task.isImportant;
 
-  return (
-    <motion.div
-      layout
-      initial={{ opacity: 0, x: -10 }}
-      animate={{ opacity: 1, x: 0 }}
-      exit={{ opacity: 0, scale: 0.95 }}
-      className="group flex items-start gap-3 p-3 rounded-xl hover:bg-slate-50 border border-slate-50 hover:border-slate-200 transition-all cursor-pointer bg-white shadow-sm"
-    >
-      <button
-        onClick={onToggle}
-        className="mt-1 text-slate-300 hover:text-indigo-600 transition-colors"
+    return (
+      <motion.div
+        ref={ref}
+        layout
+        initial={{ opacity: 0, x: -10 }}
+        animate={{ opacity: 1, x: 0 }}
+        exit={{ opacity: 0, scale: 0.95 }}
+        className="group flex items-start gap-3 p-3 rounded-xl hover:bg-slate-50 border border-slate-50 hover:border-slate-200 transition-all cursor-pointer bg-white shadow-sm"
       >
-        <Circle size={20} strokeWidth={2} />
-      </button>
+        <button
+          onClick={onToggle}
+          className="mt-1 text-slate-300 hover:text-indigo-600 transition-colors"
+        >
+          <Circle size={20} strokeWidth={2} />
+        </button>
 
-      <div className="flex-1 min-w-0">
-        <div className="flex justify-between items-start gap-2">
-          <h4 className="text-[15px] font-semibold text-slate-800 leading-tight truncate group-hover:text-indigo-700">
-            {task.title}
-          </h4>
-          {task.scheduledTime && (
-            <div className="flex items-center gap-1 text-[10px] font-bold text-slate-400 whitespace-nowrap bg-slate-50 px-1.5 py-0.5 rounded">
-              <Clock size={10} /> {task.scheduledTime}
-            </div>
-          )}
-        </div>
+        <div className="flex-1 min-w-0">
+          <div className="flex justify-between items-start gap-2">
+            <h4 className="text-[15px] font-semibold text-slate-800 leading-tight truncate group-hover:text-indigo-700">
+              {task.title}
+            </h4>
+            {task.scheduledTime && (
+              <div className="flex items-center gap-1 text-[10px] font-bold text-slate-400 whitespace-nowrap bg-slate-50 px-1.5 py-0.5 rounded">
+                <Clock size={10} /> {task.scheduledTime}
+              </div>
+            )}
+          </div>
 
-        <div className="flex items-center gap-2 mt-1.5">
-          <span
-            className={`text-[9px] font-black px-1.5 py-0.5 rounded uppercase ${
-              isCritical
-                ? "bg-rose-50 text-rose-600"
-                : "bg-indigo-50 text-indigo-600"
-            }`}
-          >
-            {isCritical ? "Priority" : "Today"}
-          </span>
-          <span className="text-slate-300 text-xs px-1">/</span>
-          <span className="text-[11px] text-slate-400 font-medium truncate">
-            {task.project}
-          </span>
+          <div className="flex items-center gap-2 mt-1.5">
+            <span
+              className={`text-[9px] font-black px-1.5 py-0.5 rounded uppercase ${
+                isCritical
+                  ? "bg-rose-50 text-rose-600"
+                  : "bg-indigo-50 text-indigo-600"
+              }`}
+            >
+              {isCritical ? "Priority" : "Today"}
+            </span>
+            <span className="text-slate-300 text-xs px-1">/</span>
+            <span className="text-[11px] text-slate-400 font-medium truncate">
+              {task.project}
+            </span>
+          </div>
         </div>
-      </div>
-    </motion.div>
-  );
-};
+      </motion.div>
+    );
+  }
+);
+
+TaskItem.displayName = "TaskItem";
 
 const EmptyState = () => (
   <motion.div

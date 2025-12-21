@@ -14,7 +14,6 @@ import { cn } from "@/lib/utils";
 import { Project, Task } from "@/types";
 import { format } from "date-fns";
 
-// Shadcn UI Components
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { Input } from "@/components/ui/input";
@@ -43,16 +42,14 @@ import {
 } from "@/components/ui/alert-dialog";
 
 interface TaskDetailPanelProps {
-  task: Task | Partial<Task> | null; // Cho phép Partial
+  task: Task;
   onClose: () => void;
   onUpdate: (id: string, updates: Partial<Task>) => void;
-  onCreate: (task: Partial<Task>) => void; // <--- NEW
   onDelete?: (id: string) => void;
   projects: Project[];
 }
 
-// --- HELPER ---
-const checkHasChanges = (original: Partial<Task>, current: Partial<Task>) => {
+const checkHasChanges = (original: Task, current: Partial<Task>) => {
   const basicFields: (keyof Task)[] = [
     "title",
     "description",
@@ -83,7 +80,6 @@ export const TaskDetailPanel = ({
   task,
   onClose,
   onUpdate,
-  onCreate,
   onDelete,
   projects,
 }: TaskDetailPanelProps) => {
@@ -98,42 +94,36 @@ export const TaskDetailPanel = ({
   const [deadlineDate, setDeadlineDate] = useState<Date | undefined>(undefined);
   const [deadlineTime, setDeadlineTime] = useState<string>("");
 
-  // --- SYNC DATA ---
+  // Sync data
   useEffect(() => {
-    if (task) {
-      // Tách các trường meta nếu có
-      const { _id, createdAt, updatedAt, __v, ...allowedFields } = task as any;
-      setFormData(allowedFields);
+    const { _id, createdAt, updatedAt, __v, ...allowedFields } = task as any;
+    setFormData(allowedFields);
 
-      // Setup Start Date
-      if (task.scheduledDate) {
-        const d = new Date(task.scheduledDate);
-        if (!isNaN(d.getTime())) {
-          setStartDate(d);
-          setStartTime(task.scheduledTime || format(d, "HH:mm"));
-        }
-      } else {
-        setStartDate(undefined);
-        setStartTime("");
+    if (task.scheduledDate) {
+      const d = new Date(task.scheduledDate);
+      if (!isNaN(d.getTime())) {
+        setStartDate(d);
+        setStartTime(task.scheduledTime || format(d, "HH:mm"));
       }
-
-      // Setup Deadline
-      if (task.deadline) {
-        const d = new Date(task.deadline);
-        if (!isNaN(d.getTime())) {
-          setDeadlineDate(d);
-          setDeadlineTime(format(d, "HH:mm"));
-        }
-      } else {
-        setDeadlineDate(undefined);
-        setDeadlineTime("");
-      }
-
-      setIsDirty(false);
+    } else {
+      setStartDate(undefined);
+      setStartTime("");
     }
+
+    if (task.deadline) {
+      const d = new Date(task.deadline);
+      if (!isNaN(d.getTime())) {
+        setDeadlineDate(d);
+        setDeadlineTime(format(d, "HH:mm"));
+      }
+    } else {
+      setDeadlineDate(undefined);
+      setDeadlineTime("");
+    }
+
+    setIsDirty(false);
   }, [task]);
 
-  // --- CHECK DIRTY ---
   useEffect(() => {
     if (task && formData) {
       const hasChanges = checkHasChanges(task, formData);
@@ -141,9 +131,6 @@ export const TaskDetailPanel = ({
     }
   }, [formData, task]);
 
-  if (!task) return null;
-
-  // --- HANDLERS ---
   const handleChange = (
     field: keyof Task,
     value: string | number | boolean | null | undefined
@@ -198,28 +185,13 @@ export const TaskDetailPanel = ({
 
   const handleSave = () => {
     if (!formData) return;
-
-    if (task && "_id" in task && task._id) {
-      // UPDATE TASK CŨ
-      onUpdate(task._id, formData);
-    } else {
-      // CREATE TASK MỚI
-      onCreate({
-        ...formData,
-        status: formData.status || "backlog",
-        isUrgent: formData.isUrgent || false,
-        isImportant: formData.isImportant || false,
-        // Đảm bảo gửi date time từ state local nếu formData chưa kịp sync (an toàn)
-        scheduledDate: formData.scheduledDate,
-        scheduledTime: formData.scheduledTime,
-      });
-    }
+    onUpdate(task._id, formData);
     setIsDirty(false);
     onClose();
   };
 
   const handleDelete = () => {
-    if (task && "_id" in task && task._id && onDelete) {
+    if (onDelete) {
       onDelete(task._id);
       onClose();
     }
@@ -245,8 +217,6 @@ export const TaskDetailPanel = ({
     return "bg-slate-100 text-slate-600 border-slate-200";
   };
 
-  const isNewTask = !(task && "_id" in task);
-
   return (
     <>
       <motion.div
@@ -267,11 +237,9 @@ export const TaskDetailPanel = ({
       >
         {/* HEADER */}
         <div className="flex items-center justify-between px-6 py-4 border-b border-slate-100 bg-white sticky top-0 z-10 min-h-[60px]">
-          <div className="flex items-center gap-2">
-            <span className="text-xs font-bold text-slate-400 uppercase tracking-wider">
-              {isNewTask ? "New Task" : "Edit Task"}
-            </span>
-          </div>
+          <span className="text-xs font-bold text-slate-400 uppercase tracking-wider">
+            Edit Task
+          </span>
           <Button
             variant="ghost"
             size="icon"
@@ -287,7 +255,7 @@ export const TaskDetailPanel = ({
           <div className="px-6 py-6 space-y-8">
             <div className="group relative">
               <Textarea
-                autoFocus={isNewTask}
+                autoFocus
                 value={formData.title || ""}
                 onChange={(e) => handleChange("title", e.target.value)}
                 className="w-full text-2xl font-bold text-slate-900 placeholder:text-slate-300 border-none shadow-none focus-visible:ring-0 resize-none p-0 bg-transparent leading-tight min-h-[40px] overflow-hidden"
@@ -524,18 +492,14 @@ export const TaskDetailPanel = ({
 
         {/* FOOTER */}
         <div className="px-6 py-4 border-t border-slate-100 bg-white flex justify-between items-center z-10 shadow-[0_-4px_6px_-1px_rgba(0,0,0,0.02)]">
-          {!isNewTask ? (
-            <Button
-              variant="ghost"
-              size="sm"
-              onClick={() => setShowDeleteDialog(true)}
-              className="text-slate-400 hover:text-rose-600 hover:bg-rose-50 h-9 text-xs font-semibold"
-            >
-              <Trash2 className="w-4 h-4 mr-2" /> Delete Task
-            </Button>
-          ) : (
-            <div />
-          )}
+          <Button
+            variant="ghost"
+            size="sm"
+            onClick={() => setShowDeleteDialog(true)}
+            className="text-rose-500 hover:text-rose-600 hover:bg-rose-50 h-9 text-xs font-semibold"
+          >
+            <Trash2 className="w-4 h-4 mr-2" /> Delete Task
+          </Button>
 
           <div className="flex items-center gap-4">
             <span
@@ -548,15 +512,15 @@ export const TaskDetailPanel = ({
             </span>
             <Button
               onClick={handleSave}
-              disabled={!isDirty && !isNewTask}
+              disabled={!isDirty}
               className={cn(
                 "h-9 text-xs font-bold px-6 transition-all duration-200 shadow-sm",
-                isDirty || isNewTask
+                isDirty
                   ? "bg-slate-900 hover:bg-slate-800 text-white"
                   : "bg-slate-100 text-slate-400 cursor-not-allowed"
               )}
             >
-              {isNewTask ? "Create Task" : "Save Changes"}
+              Save Changes
             </Button>
           </div>
         </div>

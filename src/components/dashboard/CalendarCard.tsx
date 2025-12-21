@@ -82,6 +82,7 @@ export const CalendarCard = () => {
   );
 
   const dailyEvents = useMemo(() => {
+    if (!calendarTasks) return [];
     return calendarTasks
       .filter(
         (t) =>
@@ -162,7 +163,7 @@ export const CalendarCard = () => {
             {weekDays.map((date) => {
               const isSelected = isSameDate(date, selectedDate);
               const isToday = isSameDate(date, new Date());
-              const hasEvent = calendarTasks.some(
+              const hasEvent = calendarTasks?.some(
                 (t) =>
                   t.scheduledDate && isSameDate(new Date(t.scheduledDate), date)
               );

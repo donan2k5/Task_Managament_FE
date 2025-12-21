@@ -22,7 +22,7 @@ import {
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Task } from "@/types/index";
-import { useTasks } from "@/hooks/useTasks";
+import { useTaskContext } from "@/context/TaskContext";
 import { useProjects } from "@/hooks/useProjects";
 import { TaskDetailPanel } from "@/components/tasks/TaskDetailPanel";
 import { format, isToday, isTomorrow, isPast } from "date-fns";
@@ -625,7 +625,7 @@ const Tasks = () => {
     updateTask,
     deleteTask,
     loading,
-  } = useTasks();
+  } = useTaskContext();
   const { projects: projectList } = useProjects();
   const [completedList, setCompletedList] = useState<Task[]>([]);
   const [showCompletedModal, setShowCompletedModal] = useState(false);

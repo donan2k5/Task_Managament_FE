@@ -1,176 +1,178 @@
 "use client";
 
-import { useState, useMemo, useEffect } from "react";
+import { useState, useMemo, useEffect, useCallback } from "react";
 import DashboardLayout from "@/components/layout/DashboardLayout";
-import { CalendarSidebar } from "@/components/calendar/CalendarSidebar";
 import { WeekView } from "@/components/calendar/WeekView";
-import { useTasks } from "@/hooks/useTasks";
+import { CalendarHeader } from "@/components/calendar/CalendarHeader";
+import { UnscheduledSidebar } from "@/components/calendar/UnscheduledSidebar";
+import { TaskDetailPopover } from "@/components/calendar/TaskDetailPopover";
+import { useTaskContext } from "@/context/TaskContext";
 import { useProjects } from "@/hooks/useProjects";
 import { TaskDetailPanel } from "@/components/tasks/TaskDetailPanel";
-import { Button } from "@/components/ui/button";
-import {
-  Popover,
-  PopoverContent,
-  PopoverTrigger,
-} from "@/components/ui/popover";
-import { Calendar } from "@/components/ui/calendar";
-import {
-  PanelLeftClose,
-  PanelLeftOpen,
-  ChevronLeft,
-  ChevronRight,
-  Calendar as CalendarIcon,
-} from "lucide-react";
-import { format, startOfWeek, addDays, subDays } from "date-fns";
-import { motion, AnimatePresence } from "framer-motion";
+import { startOfWeek, addDays, setHours, setMinutes } from "date-fns";
+import { AnimatePresence } from "framer-motion";
 import { Task } from "@/types";
 
 export default function CalendarPage() {
-  const [isSidebarOpen, setIsSidebarOpen] = useState(true);
   const [currentDate, setCurrentDate] = useState(new Date());
+  const [selectedTask, setSelectedTask] = useState<Task | null>(null);
+  const [popoverTask, setPopoverTask] = useState<{ task: Task; position: { x: number; y: number } } | null>(null);
+  const [editingTask, setEditingTask] = useState<Task | null>(null);
+  const [externalDragTask, setExternalDragTask] = useState<Task | null>(null);
+  const [isSidebarExpanded, setIsSidebarExpanded] = useState(false);
 
-  // State selectedTask giờ có thể là Partial<Task> (khi tạo mới)
-  const [selectedTask, setSelectedTask] = useState<Task | Partial<Task> | null>(
-    null
-  );
-
-  const {
-    calendarTasks,
-    fetchCalendarTasks,
-    updateTask,
-    addTask,
-    deleteTask,
-    loading,
-  } = useTasks();
+  const { scheduledTasks, unscheduledTasks, updateTask, addTask, deleteTask } =
+    useTaskContext();
   const { projects } = useProjects();
 
-  const range = useMemo(() => {
-    const start = startOfWeek(currentDate, { weekStartsOn: 1 });
-    const end = addDays(start, 6);
-    return { start, end };
-  }, [currentDate]);
+  // Filter tasks for current week
+  const weekStart = useMemo(
+    () => startOfWeek(currentDate, { weekStartsOn: 1 }),
+    [currentDate]
+  );
+  const weekEnd = useMemo(() => addDays(weekStart, 6), [weekStart]);
 
-  useEffect(() => {
-    fetchCalendarTasks(range.start, range.end);
-  }, [range.start, fetchCalendarTasks]);
-
-  // Handler khi click vào khoảng trống -> Mở Panel Tạo Mới
-  const handleSlotClick = (date: Date, time: string) => {
-    setSelectedTask({
-      title: "",
-      scheduledDate: date.toISOString(),
-      scheduledTime: time,
-      status: "todo",
-      isUrgent: false,
-      isImportant: false,
-      project: undefined,
+  const weekTasks = useMemo(() => {
+    return scheduledTasks.filter((task) => {
+      if (!task.scheduledDate) return false;
+      const taskDate = new Date(task.scheduledDate);
+      return taskDate >= weekStart && taskDate <= addDays(weekEnd, 1);
     });
+  }, [scheduledTasks, weekStart, weekEnd]);
+
+  // Sync selected task with context
+  useEffect(() => {
+    if (selectedTask) {
+      const updated = scheduledTasks.find((t) => t._id === selectedTask._id);
+      if (updated) {
+        setSelectedTask(updated);
+      } else {
+        const fromUnscheduled = unscheduledTasks.find(
+          (t) => t._id === selectedTask._id
+        );
+        if (fromUnscheduled) setSelectedTask(fromUnscheduled);
+      }
+    }
+  }, [scheduledTasks, unscheduledTasks, selectedTask?._id]);
+
+  // Sync popover task with context
+  useEffect(() => {
+    if (popoverTask) {
+      const updated = scheduledTasks.find((t) => t._id === popoverTask.task._id);
+      if (updated) {
+        setPopoverTask({ ...popoverTask, task: updated });
+      }
+    }
+  }, [scheduledTasks]);
+
+  // Handle task click - show popover near the click position
+  const handleTaskClick = useCallback((task: Task, event?: React.MouseEvent) => {
+    if (event) {
+      setPopoverTask({
+        task,
+        position: { x: event.clientX + 10, y: event.clientY - 20 },
+      });
+    } else {
+      // Fallback to center of screen if no event
+      setPopoverTask({
+        task,
+        position: { x: window.innerWidth / 2 - 160, y: window.innerHeight / 3 },
+      });
+    }
+  }, []);
+
+  // Handle external drag from sidebar
+  const handleExternalDragStart = (task: Task) => {
+    setExternalDragTask(task);
+  };
+
+  const handleExternalDrop = (date: Date, hour: number) => {
+    if (!externalDragTask) return;
+
+    const scheduledDate = setMinutes(setHours(date, hour), 0);
+    updateTask(externalDragTask._id, {
+      scheduledDate: scheduledDate.toISOString(),
+      scheduledTime: `${hour.toString().padStart(2, "0")}:00`,
+      status: "todo",
+    });
+    setExternalDragTask(null);
   };
 
   return (
     <DashboardLayout>
-      <div className="flex h-[calc(100vh-4rem)] overflow-hidden bg-white">
-        <AnimatePresence mode="wait">
-          {isSidebarOpen && (
-            <motion.div
-              initial={{ width: 0, opacity: 0 }}
-              animate={{ width: 260, opacity: 1 }}
-              exit={{ width: 0, opacity: 0 }}
-              className="h-full shrink-0 overflow-hidden"
-            >
-              <CalendarSidebar />
-            </motion.div>
-          )}
-        </AnimatePresence>
+      {/* Full-width calendar container with relative positioning for sidebar overlay */}
+      <div className="relative h-[calc(100vh-4rem)] overflow-hidden bg-slate-100">
+        {/* Collapsible Unscheduled Tasks Sidebar (Floating Inbox) */}
+        <UnscheduledSidebar
+          tasks={unscheduledTasks}
+          onDragStart={handleExternalDragStart}
+          onDragEnd={() => setExternalDragTask(null)}
+          onTaskClick={(task) => handleTaskClick(task)}
+          draggingTaskId={externalDragTask?._id}
+          isExpanded={isSidebarExpanded}
+          onToggleExpanded={setIsSidebarExpanded}
+        />
 
-        <div className="flex-1 flex flex-col min-w-0 bg-slate-50/50">
-          <div className="flex items-center justify-between p-3 border-b bg-white">
-            <div className="flex items-center gap-3">
-              <Button
-                variant="ghost"
-                size="icon"
-                onClick={() => setIsSidebarOpen(!isSidebarOpen)}
-              >
-                {isSidebarOpen ? (
-                  <PanelLeftClose className="w-4 h-4" />
-                ) : (
-                  <PanelLeftOpen className="w-4 h-4" />
-                )}
-              </Button>
-
-              <Popover>
-                <PopoverTrigger asChild>
-                  <Button
-                    variant="ghost"
-                    className="text-lg font-bold flex items-center gap-2 px-2 hover:bg-slate-50"
-                  >
-                    {format(currentDate, "MMMM yyyy")}
-                    <CalendarIcon className="w-4 h-4 text-slate-400" />
-                  </Button>
-                </PopoverTrigger>
-                <PopoverContent className="w-auto p-0" align="start">
-                  <Calendar
-                    mode="single"
-                    selected={currentDate}
-                    onSelect={(d) => d && setCurrentDate(d)}
-                  />
-                </PopoverContent>
-              </Popover>
-
-              <div className="flex items-center bg-slate-100 rounded-lg p-1">
-                <Button
-                  variant="ghost"
-                  size="icon"
-                  className="h-7 w-7"
-                  onClick={() => setCurrentDate(subDays(currentDate, 7))}
-                >
-                  <ChevronLeft className="w-4 h-4" />
-                </Button>
-                <Button
-                  variant="ghost"
-                  className="text-[10px] font-bold h-7 px-3"
-                  onClick={() => setCurrentDate(new Date())}
-                >
-                  Today
-                </Button>
-                <Button
-                  variant="ghost"
-                  size="icon"
-                  className="h-7 w-7"
-                  onClick={() => setCurrentDate(addDays(currentDate, 7))}
-                >
-                  <ChevronRight className="w-4 h-4" />
-                </Button>
-              </div>
-            </div>
-          </div>
-
-          <div className="flex-1 overflow-hidden">
-            <WeekView
+        {/* Main Calendar Area - Shifts right when sidebar is expanded */}
+        <div
+          className="h-full flex flex-col p-4 transition-all duration-300 ease-in-out"
+          style={{ paddingLeft: isSidebarExpanded ? '296px' : '8px' }}
+        >
+          <div className="h-full flex flex-col bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden">
+            {/* Header */}
+            <CalendarHeader
               currentDate={currentDate}
-              tasks={calendarTasks}
-              onUpdateTask={updateTask}
-              onTaskClick={(t) => setSelectedTask(t)} // Click Task -> Edit
-              onSlotClick={handleSlotClick} // Click Slot -> Create
+              onDateChange={setCurrentDate}
             />
+
+            {/* Calendar Grid */}
+            <div className="flex-1 overflow-hidden">
+              <WeekView
+                currentDate={currentDate}
+                tasks={weekTasks}
+                projects={projects}
+                onUpdateTask={updateTask}
+                onTaskClick={handleTaskClick}
+                onCreateTask={addTask}
+                externalDragTask={externalDragTask}
+                onExternalDrop={handleExternalDrop}
+              />
+            </div>
           </div>
         </div>
       </div>
 
+      {/* Task Detail Popover (Quick View) */}
       <AnimatePresence>
-        {selectedTask && (
-          <TaskDetailPanel
-            task={selectedTask}
-            onClose={() => setSelectedTask(null)}
-            onUpdate={updateTask}
-            onCreate={(newTask) => {
-              // Logic Tạo Mới
-              addTask(newTask);
-              setSelectedTask(null);
+        {popoverTask && (
+          <TaskDetailPopover
+            task={popoverTask.task}
+            position={popoverTask.position}
+            onClose={() => setPopoverTask(null)}
+            onEdit={() => {
+              setEditingTask(popoverTask.task);
+              setPopoverTask(null);
             }}
             onDelete={(id) => {
               deleteTask(id);
-              setSelectedTask(null);
+              setPopoverTask(null);
+            }}
+            onUpdate={updateTask}
+            projects={projects}
+          />
+        )}
+      </AnimatePresence>
+
+      {/* Task Detail Panel (Full Edit) */}
+      <AnimatePresence>
+        {editingTask && (
+          <TaskDetailPanel
+            task={editingTask}
+            onClose={() => setEditingTask(null)}
+            onUpdate={updateTask}
+            onDelete={(id) => {
+              deleteTask(id);
+              setEditingTask(null);
             }}
             projects={projects}
           />
