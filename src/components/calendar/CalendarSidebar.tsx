@@ -7,7 +7,7 @@ export const CalendarSidebar = () => {
 
   // Lọc task chưa lên lịch và chưa xong
   const unscheduledTasks = tasks.filter(
-    (t) => !t.scheduledTime && t.status !== "done"
+    (t) => !t.scheduledDate && t.status !== "done"
   );
 
   const onDragStart = (e: React.DragEvent, taskId: string) => {

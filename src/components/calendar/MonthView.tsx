@@ -57,7 +57,9 @@ export const MonthView = ({
           // Sort tasks: Urgent -> Important -> Time
           dayTasks.sort((a, b) => {
             if (a.isUrgent !== b.isUrgent) return a.isUrgent ? -1 : 1;
-            return (a.scheduledTime || "").localeCompare(b.scheduledTime || "");
+            const aTime = a.scheduledDate ? new Date(a.scheduledDate).getTime() : 0;
+            const bTime = b.scheduledDate ? new Date(b.scheduledDate).getTime() : 0;
+            return aTime - bTime;
           });
 
           return (
@@ -104,7 +106,7 @@ export const MonthView = ({
                     )}
                   >
                     <span className="opacity-70 mr-1">
-                      {task.scheduledTime}
+                      {task.scheduledDate && format(new Date(task.scheduledDate), "HH:mm")}
                     </span>
                     {task.title}
                   </button>

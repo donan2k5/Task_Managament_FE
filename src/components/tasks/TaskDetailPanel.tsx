@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo } from "react";
 import { motion } from "framer-motion";
 import {
   Calendar as CalendarIcon,
@@ -9,10 +9,90 @@ import {
   AlertCircle,
   CheckCircle2,
   Circle,
+  ChevronDown,
+  Clock,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Project, Task } from "@/types";
 import { format } from "date-fns";
+
+// Helper functions for time picker
+const formatTimeDisplay = (timeStr: string) => {
+  const [hours, minutes] = timeStr.split(":").map(Number);
+  const period = hours >= 12 ? "pm" : "am";
+  const displayHour = hours === 0 ? 12 : hours > 12 ? hours - 12 : hours;
+  return `${displayHour}:${minutes.toString().padStart(2, "0")}${period}`;
+};
+
+const generateTimeOptions = () => {
+  const options: string[] = [];
+  for (let h = 0; h < 24; h++) {
+    options.push(`${h.toString().padStart(2, "0")}:00`);
+    options.push(`${h.toString().padStart(2, "0")}:30`);
+  }
+  return options;
+};
+
+const calculateDefaultEndTime = (startTime: string) => {
+  const [hours] = startTime.split(":").map(Number);
+  const endHour = (hours + 1) % 24;
+  return `${endHour.toString().padStart(2, "0")}:00`;
+};
+
+const generateEndTimeOptions = (startTime: string) => {
+  const [startHours, startMinutes] = startTime.split(":").map(Number);
+  const startTotalMinutes = startHours * 60 + startMinutes;
+
+  const durations = [
+    { minutes: 15, label: "15 mins" },
+    { minutes: 30, label: "30 mins" },
+    { minutes: 45, label: "45 mins" },
+    { minutes: 60, label: "1 hr" },
+    { minutes: 90, label: "1.5 hrs" },
+    { minutes: 120, label: "2 hrs" },
+    { minutes: 180, label: "3 hrs" },
+    { minutes: 240, label: "4 hrs" },
+  ];
+
+  return durations.map(({ minutes, label }) => {
+    const endTotalMinutes = (startTotalMinutes + minutes) % (24 * 60);
+    const endHours = Math.floor(endTotalMinutes / 60);
+    const endMins = endTotalMinutes % 60;
+    const time = `${endHours.toString().padStart(2, "0")}:${endMins.toString().padStart(2, "0")}`;
+    return {
+      time,
+      label: `${formatTimeDisplay(time)} (${label})`,
+    };
+  });
+};
+
+const formatTimeWithDuration = (startTime: string, endTime: string) => {
+  const [startH, startM] = startTime.split(":").map(Number);
+  const [endH, endM] = endTime.split(":").map(Number);
+  const startTotal = startH * 60 + startM;
+  let endTotal = endH * 60 + endM;
+
+  if (endTotal <= startTotal) {
+    endTotal += 24 * 60; // Handle overnight
+  }
+
+  const durationMins = endTotal - startTotal;
+  let durationLabel = "";
+
+  if (durationMins < 60) {
+    durationLabel = `${durationMins} mins`;
+  } else if (durationMins === 60) {
+    durationLabel = "1 hr";
+  } else if (durationMins % 60 === 0) {
+    durationLabel = `${durationMins / 60} hrs`;
+  } else {
+    const hours = Math.floor(durationMins / 60);
+    const mins = durationMins % 60;
+    durationLabel = `${hours}.${Math.round(mins / 6)} hrs`;
+  }
+
+  return `${formatTimeDisplay(endTime)} (${durationLabel})`;
+};
 
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
@@ -57,7 +137,6 @@ const checkHasChanges = (original: Task, current: Partial<Task>) => {
     "project",
     "isUrgent",
     "isImportant",
-    "scheduledTime",
   ];
 
   for (const field of basicFields) {
@@ -70,6 +149,8 @@ const checkHasChanges = (original: Task, current: Partial<Task>) => {
     val ? new Date(val).getTime() : 0;
 
   if (getTime(original.scheduledDate) !== getTime(current.scheduledDate))
+    return true;
+  if (getTime(original.scheduledEndDate) !== getTime(current.scheduledEndDate))
     return true;
   if (getTime(original.deadline) !== getTime(current.deadline)) return true;
 
@@ -91,6 +172,7 @@ export const TaskDetailPanel = ({
 
   const [startDate, setStartDate] = useState<Date | undefined>(undefined);
   const [startTime, setStartTime] = useState<string>("");
+  const [endTime, setEndTime] = useState<string>("");
   const [deadlineDate, setDeadlineDate] = useState<Date | undefined>(undefined);
   const [deadlineTime, setDeadlineTime] = useState<string>("");
 
@@ -103,11 +185,19 @@ export const TaskDetailPanel = ({
       const d = new Date(task.scheduledDate);
       if (!isNaN(d.getTime())) {
         setStartDate(d);
-        setStartTime(task.scheduledTime || format(d, "HH:mm"));
+        setStartTime(format(d, "HH:mm"));
+        // Extract end time from scheduledEndDate
+        if (task.scheduledEndDate) {
+          const endD = new Date(task.scheduledEndDate);
+          setEndTime(format(endD, "HH:mm"));
+        } else {
+          setEndTime("");
+        }
       }
     } else {
       setStartDate(undefined);
       setStartTime("");
+      setEndTime("");
     }
 
     if (task.deadline) {
@@ -138,30 +228,75 @@ export const TaskDetailPanel = ({
     setFormData((prev) => ({ ...prev, [field]: value }));
   };
 
-  const updateStartDate = (date: Date | undefined, time: string) => {
+  const updateStartDate = (date: Date | undefined, time: string, newEndTime?: string) => {
     setStartDate(date);
     setStartTime(time);
 
     if (!date) {
       handleChange("scheduledDate", null);
-      handleChange("scheduledTime", null);
+      handleChange("scheduledEndDate", null);
+      setEndTime("");
       return;
     }
 
-    const mergedDate = new Date(date);
+    const mergedStartDate = new Date(date);
     let finalTime = time;
 
     if (time) {
       const [hours, minutes] = time.split(":").map(Number);
-      mergedDate.setHours(hours, minutes);
+      mergedStartDate.setHours(hours, minutes, 0, 0);
     } else {
-      mergedDate.setHours(9, 0);
+      mergedStartDate.setHours(9, 0, 0, 0);
       finalTime = "09:00";
       setStartTime("09:00");
     }
 
-    handleChange("scheduledDate", mergedDate.toISOString());
-    handleChange("scheduledTime", finalTime);
+    handleChange("scheduledDate", mergedStartDate.toISOString());
+
+    // Calculate end date
+    let endTimeToUse = newEndTime !== undefined ? newEndTime : endTime;
+
+    // If no end time and first time setting, auto-set end time to +1 hour
+    if (!endTimeToUse && finalTime) {
+      const [hours] = finalTime.split(":").map(Number);
+      endTimeToUse = `${((hours + 1) % 24).toString().padStart(2, "0")}:00`;
+    }
+
+    if (endTimeToUse) {
+      setEndTime(endTimeToUse);
+      const [endHours, endMinutes] = endTimeToUse.split(":").map(Number);
+      const mergedEndDate = new Date(date);
+      mergedEndDate.setHours(endHours, endMinutes, 0, 0);
+      // Handle overnight case
+      if (mergedEndDate <= mergedStartDate) {
+        mergedEndDate.setDate(mergedEndDate.getDate() + 1);
+      }
+      handleChange("scheduledEndDate", mergedEndDate.toISOString());
+    }
+  };
+
+  const updateEndTime = (newEndTime: string) => {
+    setEndTime(newEndTime);
+
+    if (!startDate || !newEndTime) {
+      handleChange("scheduledEndDate", null);
+      return;
+    }
+
+    const [endHours, endMinutes] = newEndTime.split(":").map(Number);
+    const mergedEndDate = new Date(startDate);
+    mergedEndDate.setHours(endHours, endMinutes, 0, 0);
+
+    // Handle overnight case
+    const startDateTime = new Date(startDate);
+    const [startHours, startMinutes] = startTime.split(":").map(Number);
+    startDateTime.setHours(startHours, startMinutes, 0, 0);
+
+    if (mergedEndDate <= startDateTime) {
+      mergedEndDate.setDate(mergedEndDate.getDate() + 1);
+    }
+
+    handleChange("scheduledEndDate", mergedEndDate.toISOString());
   };
 
   const updateDeadline = (date: Date | undefined, time: string) => {
@@ -309,11 +444,11 @@ export const TaskDetailPanel = ({
                 </Select>
               </div>
 
-              {/* START DATE */}
+              {/* SCHEDULED TIME (Calendar Event) */}
               <div className="text-sm font-medium text-slate-500">
-                Start Date
+                Schedule
               </div>
-              <div className="flex items-center gap-2">
+              <div className="flex items-center gap-2 flex-wrap">
                 <Popover>
                   <PopoverTrigger asChild>
                     <Button
@@ -327,7 +462,7 @@ export const TaskDetailPanel = ({
                     >
                       <CalendarIcon className="w-3.5 h-3.5 mr-2 opacity-70" />
                       {startDate
-                        ? format(startDate, "MMM d, yyyy")
+                        ? format(startDate, "EEEE, MMM d")
                         : "Pick date"}
                     </Button>
                   </PopoverTrigger>
@@ -341,17 +476,46 @@ export const TaskDetailPanel = ({
                   </PopoverContent>
                 </Popover>
                 {startDate && (
-                  <Input
-                    type="time"
-                    className="h-8 w-[90px] text-xs font-medium border-slate-200 bg-white focus:ring-0"
-                    value={startTime}
-                    onChange={(e) => updateStartDate(startDate, e.target.value)}
-                  />
+                  <>
+                    {/* Start Time Picker */}
+                    <Select
+                      value={startTime || "09:00"}
+                      onValueChange={(val) => updateStartDate(startDate, val)}
+                    >
+                      <SelectTrigger className="h-8 w-[85px] text-xs font-medium border-slate-200 bg-white">
+                        {formatTimeDisplay(startTime || "09:00")}
+                      </SelectTrigger>
+                      <SelectContent className="z-[90] max-h-[200px]">
+                        {generateTimeOptions().map((time) => (
+                          <SelectItem key={time} value={time} className="text-xs">
+                            {formatTimeDisplay(time)}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                    <span className="text-slate-300 text-xs">-</span>
+                    {/* End Time Picker with Duration */}
+                    <Select
+                      value={endTime || calculateDefaultEndTime(startTime || "09:00")}
+                      onValueChange={(val) => updateEndTime(val)}
+                    >
+                      <SelectTrigger className="h-8 w-auto min-w-[140px] text-xs font-medium border-slate-200 bg-white">
+                        {formatTimeWithDuration(startTime || "09:00", endTime || calculateDefaultEndTime(startTime || "09:00"))}
+                      </SelectTrigger>
+                      <SelectContent className="z-[90] max-h-[240px]">
+                        {generateEndTimeOptions(startTime || "09:00").map((option) => (
+                          <SelectItem key={option.time} value={option.time} className="text-xs">
+                            {option.label}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </>
                 )}
               </div>
 
               {/* DEADLINE */}
-              <div className="text-sm font-medium text-slate-500">Due Date</div>
+              <div className="text-sm font-medium text-slate-500">Deadline</div>
               <div className="flex items-center gap-2">
                 <Popover>
                   <PopoverTrigger asChild>
@@ -367,27 +531,34 @@ export const TaskDetailPanel = ({
                       <Flag className="w-3.5 h-3.5 mr-2 opacity-70" />
                       {deadlineDate
                         ? format(deadlineDate, "MMM d, yyyy")
-                        : "No due date"}
+                        : "No deadline"}
                     </Button>
                   </PopoverTrigger>
                   <PopoverContent className="w-auto p-0 z-[80]" align="start">
                     <Calendar
                       mode="single"
                       selected={deadlineDate}
-                      onSelect={(d) => updateDeadline(d, deadlineTime)}
+                      onSelect={(d) => updateDeadline(d, deadlineTime || "23:59")}
                       initialFocus
                     />
                   </PopoverContent>
                 </Popover>
                 {deadlineDate && (
-                  <Input
-                    type="time"
-                    className="h-8 w-[90px] text-xs font-medium border-slate-200 bg-white focus:ring-0"
-                    value={deadlineTime}
-                    onChange={(e) =>
-                      updateDeadline(deadlineDate, e.target.value)
-                    }
-                  />
+                  <Select
+                    value={deadlineTime || "23:59"}
+                    onValueChange={(val) => updateDeadline(deadlineDate, val)}
+                  >
+                    <SelectTrigger className="h-8 w-[85px] text-xs font-medium border-slate-200 bg-white">
+                      {formatTimeDisplay(deadlineTime || "23:59")}
+                    </SelectTrigger>
+                    <SelectContent className="z-[90] max-h-[200px]">
+                      {generateTimeOptions().map((time) => (
+                        <SelectItem key={time} value={time} className="text-xs">
+                          {formatTimeDisplay(time)}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
                 )}
               </div>
 
@@ -483,7 +654,7 @@ export const TaskDetailPanel = ({
               <Textarea
                 value={formData.description || ""}
                 onChange={(e) => handleChange("description", e.target.value)}
-                className="min-h-[200px] w-full text-sm text-slate-700 leading-relaxed border border-slate-100 focus-visible:ring-1 focus:ring-slate-200 focus:border-slate-300 bg-slate-50/50 p-4 rounded-xl resize-none placeholder:text-slate-400"
+                className="min-h-[120px] w-full text-sm text-slate-700 leading-relaxed border border-slate-100 focus-visible:ring-1 focus:ring-slate-200 focus:border-slate-300 bg-slate-50/50 p-4 rounded-xl resize-y placeholder:text-slate-400"
                 placeholder="Add more details about this task..."
               />
             </div>

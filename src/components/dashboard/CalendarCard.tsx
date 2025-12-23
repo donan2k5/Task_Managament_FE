@@ -3,12 +3,7 @@ import { motion, AnimatePresence } from "framer-motion";
 import {
   ChevronLeft,
   ChevronRight,
-  Video,
-  MapPin,
-  MoreHorizontal,
-  Calendar as CalendarIcon,
-  X,
-  ChevronDown,
+  Calendar,
   Clock,
   Loader2,
 } from "lucide-react";
@@ -89,7 +84,6 @@ export const CalendarCard = () => {
           t.scheduledDate && isSameDate(new Date(t.scheduledDate), selectedDate)
       )
       .sort((a, b) => {
-        // Sắp xếp theo thời gian (giờ:phút)
         const timeA = new Date(a.scheduledDate!).getTime();
         const timeB = new Date(b.scheduledDate!).getTime();
         return timeA - timeB;
@@ -111,13 +105,13 @@ export const CalendarCard = () => {
     <motion.div
       initial={{ opacity: 0, y: 10 }}
       animate={{ opacity: 1, y: 0 }}
-      className="bg-white rounded-2xl shadow-sm border border-slate-200 p-5 flex flex-col relative z-20 min-h-[500px]"
+      className="bg-white rounded-2xl shadow-sm border border-slate-200 p-5 flex flex-col relative z-20"
     >
       {/* HEADER */}
       <div className="flex items-center justify-between mb-5">
         <div className="flex items-center gap-2 select-none">
           <div className="p-2 bg-indigo-50 rounded-lg">
-            <CalendarIcon className="w-5 h-5 text-indigo-600" />
+            <Calendar className="w-5 h-5 text-indigo-600" />
           </div>
           <div>
             <h3 className="text-base font-bold text-slate-900">
@@ -201,7 +195,7 @@ export const CalendarCard = () => {
       </div>
 
       {/* EVENT LIST */}
-      <div className="flex flex-col gap-3 flex-1 overflow-y-auto custom-scrollbar pr-1">
+      <div className="flex flex-col gap-3">
         <AnimatePresence mode="popLayout">
           {loading ? (
             <div className="flex flex-col items-center justify-center py-10 opacity-50">
@@ -222,11 +216,14 @@ export const CalendarCard = () => {
 // --- SUB COMPONENTS ---
 
 const EventItem = ({ task }: { task: Task }) => {
-  // Bóc tách giờ từ scheduledDate nếu không có field scheduledTime riêng
   const displayTime = useMemo(() => {
-    if (task.scheduledTime) return task.scheduledTime;
-    return formatTime(task.scheduledDate);
-  }, [task.scheduledTime, task.scheduledDate]);
+    if (!task.scheduledDate) return "";
+    const startTime = formatTime(task.scheduledDate);
+    if (task.scheduledEndDate) {
+      return `${startTime} - ${formatTime(task.scheduledEndDate)}`;
+    }
+    return startTime;
+  }, [task.scheduledDate, task.scheduledEndDate]);
 
   return (
     <motion.div
@@ -236,7 +233,7 @@ const EventItem = ({ task }: { task: Task }) => {
       exit={{ opacity: 0, x: 10 }}
       className="group relative flex gap-3 p-3.5 rounded-xl bg-white border border-slate-100 shadow-sm hover:shadow-md hover:border-indigo-100 transition-all cursor-pointer"
     >
-      <div className="flex flex-col items-center min-w-[42px] pt-0.5">
+      <div className="flex flex-col items-center min-w-[60px] pt-0.5">
         <span className="text-xs font-bold text-slate-800">{displayTime}</span>
         <div className="w-[2px] h-full bg-slate-100 my-1.5 group-hover:bg-indigo-200 transition-colors rounded-full" />
       </div>
@@ -270,7 +267,7 @@ const EmptyState = () => (
   <motion.div
     initial={{ opacity: 0 }}
     animate={{ opacity: 1 }}
-    className="flex-1 flex flex-col items-center justify-center text-center py-10 border-2 border-dashed border-slate-50 rounded-2xl bg-slate-50/30"
+    className="flex flex-col items-center justify-center text-center py-8 border-2 border-dashed border-slate-100 rounded-2xl bg-slate-50/30"
   >
     <Clock className="w-8 h-8 text-slate-200 mb-2" />
     <p className="text-xs text-slate-400 font-medium tracking-wide">

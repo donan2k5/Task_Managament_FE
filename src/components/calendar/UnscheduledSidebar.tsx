@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useRef, useState, useEffect } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { Inbox, GripVertical, ChevronLeft, ChevronRight } from "lucide-react";
 import { cn } from "@/lib/utils";
@@ -12,6 +12,7 @@ interface UnscheduledSidebarProps {
   draggingTaskId?: string;
   isExpanded: boolean;
   onToggleExpanded: (expanded: boolean) => void;
+  onReorder?: (tasks: Task[]) => void;
 }
 
 export const UnscheduledSidebar = ({
@@ -22,11 +23,106 @@ export const UnscheduledSidebar = ({
   draggingTaskId,
   isExpanded,
   onToggleExpanded,
+  onReorder,
 }: UnscheduledSidebarProps) => {
   const isDragging = !!draggingTaskId;
+  const dragImageRef = useRef<HTMLDivElement>(null);
+
+  // State for internal reordering
+  const [orderedTasks, setOrderedTasks] = useState<Task[]>(tasks);
+  const [dragOverIndex, setDragOverIndex] = useState<number | null>(null);
+  const [isDraggingOutside, setIsDraggingOutside] = useState(false);
+
+  // Sync with parent tasks
+  useEffect(() => {
+    setOrderedTasks(tasks);
+  }, [tasks]);
+
+  // Handle drag start with custom drag image
+  const handleDragStart = (e: React.DragEvent, task: Task, index: number) => {
+    // Set drag data for cross-component communication
+    e.dataTransfer.setData("application/json", JSON.stringify(task));
+    e.dataTransfer.setData("text/plain", index.toString());
+    e.dataTransfer.effectAllowed = "move";
+
+    // Create custom drag image for better UX
+    if (dragImageRef.current) {
+      dragImageRef.current.textContent = task.title;
+      e.dataTransfer.setDragImage(dragImageRef.current, 0, 0);
+    }
+
+    // Notify parent
+    onDragStart(task);
+  };
+
+  const handleDragEnd = (e: React.DragEvent) => {
+    e.preventDefault();
+    setDragOverIndex(null);
+    setIsDraggingOutside(false);
+    onDragEnd();
+  };
+
+  // Internal reorder handlers
+  const handleDragOverTask = (e: React.DragEvent, index: number) => {
+    e.preventDefault();
+    e.stopPropagation();
+    setDragOverIndex(index);
+  };
+
+  const handleDropOnTask = (e: React.DragEvent, dropIndex: number) => {
+    e.preventDefault();
+    e.stopPropagation();
+
+    const draggedIndexStr = e.dataTransfer.getData("text/plain");
+    if (!draggedIndexStr) return;
+
+    const draggedIndex = parseInt(draggedIndexStr);
+    if (draggedIndex === dropIndex) {
+      setDragOverIndex(null);
+      return;
+    }
+
+    // Reorder tasks
+    const newTasks = [...orderedTasks];
+    const [movedTask] = newTasks.splice(draggedIndex, 1);
+    newTasks.splice(dropIndex, 0, movedTask);
+
+    setOrderedTasks(newTasks);
+    setDragOverIndex(null);
+
+    // Notify parent to persist
+    onReorder?.(newTasks);
+  };
+
+  const handleDragLeaveTask = () => {
+    setDragOverIndex(null);
+  };
+
+  // Track when dragging outside sidebar
+  const handleDragLeaveDrawer = (e: React.DragEvent) => {
+    const rect = e.currentTarget.getBoundingClientRect();
+    if (
+      e.clientX < rect.left ||
+      e.clientX > rect.right ||
+      e.clientY < rect.top ||
+      e.clientY > rect.bottom
+    ) {
+      setIsDraggingOutside(true);
+    }
+  };
+
+  const handleDragEnterDrawer = () => {
+    setIsDraggingOutside(false);
+  };
 
   return (
     <>
+      {/* Hidden drag image element */}
+      <div
+        ref={dragImageRef}
+        className="fixed -left-[9999px] bg-blue-500 text-white px-3 py-2 rounded-lg text-sm font-medium shadow-lg max-w-[200px] truncate"
+      />
+
       {/* Collapsed State - Minimal Tab */}
       <AnimatePresence>
         {!isExpanded && (
@@ -52,28 +148,20 @@ export const UnscheduledSidebar = ({
       <AnimatePresence>
         {isExpanded && (
           <>
-            {/* Backdrop */}
-            <motion.div
-              initial={{ opacity: 0 }}
-              animate={{ opacity: 1 }}
-              exit={{ opacity: 0 }}
-              onClick={() => onToggleExpanded(false)}
-              className="absolute inset-0 bg-black/5 z-20"
-            />
-
-            {/* Drawer - Fades when dragging to calendar */}
+            {/* Drawer */}
             <motion.div
               initial={{ x: "-100%", opacity: 0 }}
               animate={{
                 x: 0,
-                opacity: isDragging ? 0.4 : 1,
-                filter: isDragging ? "blur(2px)" : "blur(0px)",
+                opacity: isDragging && isDraggingOutside ? 0.3 : 1,
               }}
               exit={{ x: "-100%", opacity: 0 }}
               transition={{ type: "spring", damping: 25, stiffness: 300 }}
+              onDragLeave={handleDragLeaveDrawer}
+              onDragEnter={handleDragEnterDrawer}
               className={cn(
                 "absolute left-0 top-0 bottom-0 w-72 bg-white border-r border-slate-200 shadow-xl z-30 flex flex-col",
-                isDragging && "pointer-events-none"
+                isDragging && isDraggingOutside && "pointer-events-none"
               )}
             >
               {/* Header */}
@@ -101,13 +189,13 @@ export const UnscheduledSidebar = ({
                 </div>
                 <p className="text-[11px] text-slate-400 mt-3 flex items-center gap-1.5">
                   <GripVertical className="w-3 h-3" />
-                  Drag tasks to calendar to schedule
+                  Drag to reorder or schedule
                 </p>
               </div>
 
               {/* Task List */}
               <div className="flex-1 overflow-y-auto p-3 space-y-2">
-                {tasks.length === 0 ? (
+                {orderedTasks.length === 0 ? (
                   <div className="text-center py-12 text-slate-400">
                     <div className="w-12 h-12 rounded-full bg-slate-100 flex items-center justify-center mx-auto mb-3">
                       <Inbox className="w-6 h-6 opacity-50" />
@@ -116,19 +204,24 @@ export const UnscheduledSidebar = ({
                     <p className="text-xs mt-1">No unscheduled tasks</p>
                   </div>
                 ) : (
-                  tasks.map((task) => (
-                    <motion.div
+                  orderedTasks.map((task, index) => (
+                    <div
                       key={task._id}
-                      layoutId={`sidebar-${task._id}`}
                       draggable
-                      onDragStart={() => onDragStart(task)}
-                      onDragEnd={onDragEnd}
-                      onClick={() => onTaskClick(task)}
+                      onDragStart={(e) => handleDragStart(e, task, index)}
+                      onDragEnd={handleDragEnd}
+                      onDragOver={(e) => handleDragOverTask(e, index)}
+                      onDrop={(e) => handleDropOnTask(e, index)}
+                      onDragLeave={handleDragLeaveTask}
+                      onClick={() => !isDragging && onTaskClick(task)}
                       className={cn(
                         "group p-3 bg-white rounded-xl border cursor-grab active:cursor-grabbing transition-all",
-                        // Professional color scheme for task cards
                         "border-slate-200 hover:border-blue-200 hover:shadow-md hover:bg-blue-50/30",
-                        draggingTaskId === task._id && "opacity-50 scale-[0.98]"
+                        draggingTaskId === task._id &&
+                          "opacity-50 scale-95 shadow-lg",
+                        dragOverIndex === index &&
+                          draggingTaskId &&
+                          "border-blue-400 border-2 bg-blue-50/70 scale-105"
                       )}
                     >
                       <div className="flex items-start gap-2.5">
@@ -146,7 +239,6 @@ export const UnscheduledSidebar = ({
                         <div
                           className={cn(
                             "w-2 h-2 rounded-full mt-1.5 shrink-0",
-                            // Softer priority colors
                             task.isUrgent && task.isImportant
                               ? "bg-rose-400"
                               : task.isImportant
@@ -157,7 +249,7 @@ export const UnscheduledSidebar = ({
                           )}
                         />
                       </div>
-                    </motion.div>
+                    </div>
                   ))
                 )}
               </div>

@@ -6,12 +6,15 @@ import { WeekView } from "@/components/calendar/WeekView";
 import { CalendarHeader } from "@/components/calendar/CalendarHeader";
 import { UnscheduledSidebar } from "@/components/calendar/UnscheduledSidebar";
 import { TaskDetailPopover } from "@/components/calendar/TaskDetailPopover";
+import { GoogleCalendarSettings } from "@/components/google";
 import { useTaskContext } from "@/context/TaskContext";
 import { useProjects } from "@/hooks/useProjects";
 import { TaskDetailPanel } from "@/components/tasks/TaskDetailPanel";
 import { startOfWeek, addDays, setHours, setMinutes } from "date-fns";
-import { AnimatePresence } from "framer-motion";
+import { AnimatePresence, motion } from "framer-motion";
 import { Task } from "@/types";
+import { X } from "lucide-react";
+import { Button } from "@/components/ui/button";
 
 export default function CalendarPage() {
   const [currentDate, setCurrentDate] = useState(new Date());
@@ -20,6 +23,7 @@ export default function CalendarPage() {
   const [editingTask, setEditingTask] = useState<Task | null>(null);
   const [externalDragTask, setExternalDragTask] = useState<Task | null>(null);
   const [isSidebarExpanded, setIsSidebarExpanded] = useState(false);
+  const [showSyncSettings, setShowSyncSettings] = useState(false);
 
   const { scheduledTasks, unscheduledTasks, updateTask, addTask, deleteTask } =
     useTaskContext();
@@ -89,10 +93,12 @@ export default function CalendarPage() {
   const handleExternalDrop = (date: Date, hour: number) => {
     if (!externalDragTask) return;
 
-    const scheduledDate = setMinutes(setHours(date, hour), 0);
+    const startDate = setMinutes(setHours(date, hour), 0);
+    const endDate = new Date(startDate.getTime() + 60 * 60 * 1000); // +1 hour
+
     updateTask(externalDragTask._id, {
-      scheduledDate: scheduledDate.toISOString(),
-      scheduledTime: `${hour.toString().padStart(2, "0")}:00`,
+      scheduledDate: startDate.toISOString(),
+      scheduledEndDate: endDate.toISOString(),
       status: "todo",
     });
     setExternalDragTask(null);
@@ -123,6 +129,7 @@ export default function CalendarPage() {
             <CalendarHeader
               currentDate={currentDate}
               onDateChange={setCurrentDate}
+              onOpenSyncSettings={() => setShowSyncSettings(true)}
             />
 
             {/* Calendar Grid */}
@@ -176,6 +183,39 @@ export default function CalendarPage() {
             }}
             projects={projects}
           />
+        )}
+      </AnimatePresence>
+
+      {/* Sync Settings Modal */}
+      <AnimatePresence>
+        {showSyncSettings && (
+          <>
+            <motion.div
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              className="fixed inset-0 bg-black/30 backdrop-blur-sm z-[80]"
+              onClick={() => setShowSyncSettings(false)}
+            />
+            <motion.div
+              initial={{ opacity: 0, scale: 0.95, y: 20 }}
+              animate={{ opacity: 1, scale: 1, y: 0 }}
+              exit={{ opacity: 0, scale: 0.95, y: 20 }}
+              className="fixed inset-0 z-[90] flex items-center justify-center p-4"
+            >
+              <div className="relative bg-white rounded-2xl shadow-2xl max-w-lg w-full max-h-[90vh] overflow-y-auto">
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  className="absolute right-3 top-3 z-10 h-8 w-8 text-slate-400 hover:text-slate-600"
+                  onClick={() => setShowSyncSettings(false)}
+                >
+                  <X className="w-4 h-4" />
+                </Button>
+                <GoogleCalendarSettings />
+              </div>
+            </motion.div>
+          </>
         )}
       </AnimatePresence>
     </DashboardLayout>

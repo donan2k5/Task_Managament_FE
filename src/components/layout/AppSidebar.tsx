@@ -8,6 +8,7 @@ import {
   BarChart3,
   Settings,
   Plus,
+  FolderKanban,
 } from "lucide-react";
 import { currentUser } from "@/data/mockData";
 import { cn } from "@/lib/utils";
@@ -16,6 +17,7 @@ const navItems = [
   { icon: Home, label: "Home", path: "/" },
   { icon: CheckSquare, label: "My tasks", path: "/tasks" },
   { icon: Calendar, label: "Calendar", path: "/calendar" },
+  { icon: FolderKanban, label: "Projects", path: "/projects" },
   { icon: BarChart3, label: "Reports & Analytics", path: "/analytics" },
 ];
 
