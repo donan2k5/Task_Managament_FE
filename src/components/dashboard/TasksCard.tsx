@@ -1,14 +1,19 @@
-import { useState, useMemo, forwardRef } from "react";
+import { useState, useMemo, forwardRef, useCallback } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { MoreHorizontal, Clock, CheckCircle2, Circle } from "lucide-react";
+import { MoreHorizontal, Clock, CheckCircle2, Circle, Loader2 } from "lucide-react";
+import { format } from "date-fns";
 import { Task } from "@/types/index";
+import { taskService } from "@/services/task.service";
+import { toast } from "sonner";
 
 interface TasksCardProps {
   tasks: Task[];
+  onTaskUpdated?: (task: Task) => void;
 }
 
-export const TasksCard = ({ tasks: initialTasks }: TasksCardProps) => {
+export const TasksCard = ({ tasks: initialTasks, onTaskUpdated }: TasksCardProps) => {
   const [localTasks, setLocalTasks] = useState<Task[]>(initialTasks);
+  const [loadingTaskIds, setLoadingTaskIds] = useState<Set<string>>(new Set());
 
   // Logic lọc và phân loại task
   const { todoTasks, todayAccomplished } = useMemo(() => {
@@ -40,13 +45,55 @@ export const TasksCard = ({ tasks: initialTasks }: TasksCardProps) => {
     return { todoTasks: todo, todayAccomplished: accomplished };
   }, [localTasks]);
 
-  const toggleTask = (taskId: string) => {
+  const toggleTask = useCallback(async (taskId: string) => {
+    const task = localTasks.find((t) => t._id === taskId);
+    if (!task) return;
+
+    // Add to loading state
+    setLoadingTaskIds((prev) => new Set(prev).add(taskId));
+
+    // Optimistic update
+    const newCompleted = !task.completed;
+    const newStatus = newCompleted ? "done" : "todo";
+
     setLocalTasks((prev) =>
       prev.map((t) =>
-        t._id === taskId ? { ...t, completed: !t.completed } : t
+        t._id === taskId ? { ...t, completed: newCompleted, status: newStatus } : t
       )
     );
-  };
+
+    try {
+      const updatedTask = await taskService.update(taskId, {
+        completed: newCompleted,
+        status: newStatus,
+      });
+
+      // Update local state with API response
+      setLocalTasks((prev) =>
+        prev.map((t) => (t._id === taskId ? { ...t, ...updatedTask } : t))
+      );
+
+      // Notify parent if callback provided
+      onTaskUpdated?.(updatedTask);
+
+      toast.success(newCompleted ? "Task completed!" : "Task restored");
+    } catch (error) {
+      // Rollback on error
+      setLocalTasks((prev) =>
+        prev.map((t) =>
+          t._id === taskId ? { ...t, completed: task.completed, status: task.status } : t
+        )
+      );
+      toast.error("Failed to update task");
+      console.error("Error updating task:", error);
+    } finally {
+      setLoadingTaskIds((prev) => {
+        const newSet = new Set(prev);
+        newSet.delete(taskId);
+        return newSet;
+      });
+    }
+  }, [localTasks, onTaskUpdated]);
 
   return (
     <motion.div
@@ -78,6 +125,7 @@ export const TasksCard = ({ tasks: initialTasks }: TasksCardProps) => {
                 key={task._id}
                 task={task}
                 onToggle={() => toggleTask(task._id)}
+                isLoading={loadingTaskIds.has(task._id)}
               />
             ))
           ) : (
@@ -118,8 +166,8 @@ export const TasksCard = ({ tasks: initialTasks }: TasksCardProps) => {
 
 // --- Sub-components ---
 
-const TaskItem = forwardRef<HTMLDivElement, { task: Task; onToggle: () => void }>(
-  ({ task, onToggle }, ref) => {
+const TaskItem = forwardRef<HTMLDivElement, { task: Task; onToggle: () => void; isLoading?: boolean }>(
+  ({ task, onToggle, isLoading }, ref) => {
     const isCritical = task.isUrgent && task.isImportant;
 
     return (
@@ -133,9 +181,14 @@ const TaskItem = forwardRef<HTMLDivElement, { task: Task; onToggle: () => void }
       >
         <button
           onClick={onToggle}
-          className="mt-1 text-slate-300 hover:text-indigo-600 transition-colors"
+          disabled={isLoading}
+          className="mt-1 text-slate-300 hover:text-indigo-600 transition-colors disabled:opacity-50"
         >
-          <Circle size={20} strokeWidth={2} />
+          {isLoading ? (
+            <Loader2 size={20} className="animate-spin text-indigo-500" />
+          ) : (
+            <Circle size={20} strokeWidth={2} />
+          )}
         </button>
 
         <div className="flex-1 min-w-0">
@@ -143,9 +196,9 @@ const TaskItem = forwardRef<HTMLDivElement, { task: Task; onToggle: () => void }
             <h4 className="text-[15px] font-semibold text-slate-800 leading-tight truncate group-hover:text-indigo-700">
               {task.title}
             </h4>
-            {task.scheduledTime && (
+            {task.scheduledDate && (
               <div className="flex items-center gap-1 text-[10px] font-bold text-slate-400 whitespace-nowrap bg-slate-50 px-1.5 py-0.5 rounded">
-                <Clock size={10} /> {task.scheduledTime}
+                <Clock size={10} /> {format(new Date(task.scheduledDate), "HH:mm")}
               </div>
             )}
           </div>

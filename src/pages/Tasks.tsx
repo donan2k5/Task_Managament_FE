@@ -67,6 +67,21 @@ const getTaskDateLabel = (dateString?: string) => {
   }
 };
 
+// Time formatting helpers
+const formatTimeForDisplay = (timeStr: string) => {
+  const [hours, minutes] = timeStr.split(":").map(Number);
+  const period = hours >= 12 ? "pm" : "am";
+  const displayHour = hours === 0 ? 12 : hours > 12 ? hours - 12 : hours;
+  return `${displayHour}:${minutes.toString().padStart(2, "0")}${period}`;
+};
+
+const QUICK_TIME_OPTIONS = [
+  "09:00", "10:00", "11:00", "12:00",
+  "13:00", "14:00", "15:00", "16:00",
+  "17:00", "18:00", "19:00", "20:00",
+  "21:00", "22:00", "23:00", "23:59",
+];
+
 // --- COMPONENT: DEADLINE BADGE ---
 const DeadlineBadge = ({ deadline }: { deadline?: string }) => {
   if (!deadline) return null;
@@ -442,11 +457,11 @@ const TaskCard = forwardRef<HTMLDivElement, any>(
                   <CalendarIcon className="w-3 h-3" />
                   {getTaskDateLabel(task.scheduledDate)}
                 </span>
-                {task.scheduledTime && (
+                {task.scheduledDate && (
                   <>
                     <span className="opacity-40 text-slate-400">|</span>
                     <span className="flex items-center gap-1 font-bold text-slate-600">
-                      {task.scheduledTime}
+                      {format(new Date(task.scheduledDate), "HH:mm")}
                     </span>
                   </>
                 )}
@@ -641,6 +656,7 @@ const Tasks = () => {
   const [quickDeadline, setQuickDeadline] = useState<Date | undefined>(
     undefined
   );
+  const [quickDeadlineTime, setQuickDeadlineTime] = useState<string>("23:59");
 
   useEffect(() => {
     if (selectedTask) {
@@ -657,10 +673,18 @@ const Tasks = () => {
   const handleQuickAdd = () => {
     if (!quickTitle.trim()) return;
 
+    let deadlineISO: string | undefined;
+    if (quickDeadline) {
+      const deadlineDate = new Date(quickDeadline);
+      const [hours, minutes] = quickDeadlineTime.split(":").map(Number);
+      deadlineDate.setHours(hours, minutes);
+      deadlineISO = deadlineDate.toISOString();
+    }
+
     addTask({
       title: quickTitle,
       project: quickProject || undefined,
-      deadline: quickDeadline ? quickDeadline.toISOString() : undefined,
+      deadline: deadlineISO,
       scheduledDate: undefined,
       isUrgent: false,
       isImportant: false,
@@ -670,6 +694,7 @@ const Tasks = () => {
 
     setQuickTitle("");
     setQuickDeadline(undefined);
+    setQuickDeadlineTime("23:59");
   };
 
   const handleComplete = (id: string) => {
@@ -841,11 +866,26 @@ const Tasks = () => {
                       >
                         <Flag className="w-3 h-3" />
                         {quickDeadline
-                          ? format(quickDeadline, "MMM d")
+                          ? `${format(quickDeadline, "MMM d")} ${formatTimeForDisplay(quickDeadlineTime)}`
                           : "Deadline"}
                       </button>
                     </PopoverTrigger>
                     <PopoverContent className="w-auto p-0 z-[100]" align="end">
+                      <div className="p-3 border-b border-slate-100">
+                        <div className="text-xs font-semibold text-slate-500 mb-2">Time</div>
+                        <Select value={quickDeadlineTime} onValueChange={setQuickDeadlineTime}>
+                          <SelectTrigger className="h-8 w-full text-xs">
+                            <SelectValue>{formatTimeForDisplay(quickDeadlineTime)}</SelectValue>
+                          </SelectTrigger>
+                          <SelectContent className="z-[110] max-h-[200px]">
+                            {QUICK_TIME_OPTIONS.map((time) => (
+                              <SelectItem key={time} value={time} className="text-xs">
+                                {formatTimeForDisplay(time)}
+                              </SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                      </div>
                       <Calendar
                         mode="single"
                         selected={quickDeadline}

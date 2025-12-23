@@ -2,13 +2,16 @@ import api from "./api";
 import { Task } from "@/types/index";
 
 export const taskService = {
-  // ... các hàm cũ giữ nguyên ...
   getAll: async () => {
     const response = await api.get<Task[]>("/tasks");
     return response.data;
   },
 
-  // NEW: Lấy task theo dải thời gian cho Calendar
+  getByProject: async (projectId: string) => {
+    const response = await api.get<Task[]>(`/tasks?project=${projectId}`);
+    return response.data;
+  },
+
   getCalendarTasks: async (start: Date, end: Date) => {
     const response = await api.get<Task[]>("/tasks/calendar", {
       params: {

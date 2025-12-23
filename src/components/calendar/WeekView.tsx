@@ -16,9 +16,7 @@ import { Plus } from "lucide-react";
 const HOUR_HEIGHT = 60;
 const HOURS = Array.from({ length: 24 }, (_, i) => i);
 const MODAL_WIDTH = 448;
-const DRAG_THRESHOLD = 5; // pixels before drag starts
-const EDGE_SCROLL_THRESHOLD = 60; // pixels from edge to trigger scroll
-const EDGE_SCROLL_SPEED = 8; // pixels per frame
+const DRAG_THRESHOLD = 5;
 
 interface WeekViewProps {
   currentDate: Date;
@@ -44,8 +42,11 @@ export const WeekView = ({
   const containerRef = useRef<HTMLDivElement>(null);
   const scrollRef = useRef<HTMLDivElement>(null);
   const gridRef = useRef<HTMLDivElement>(null);
-  const autoScrollRef = useRef<number | null>(null);
-  const mouseYRef = useRef<number>(0);
+  const rafRef = useRef<number | null>(null);
+
+  // Store mouse position in ref for continuous access
+  const mouseRef = useRef({ x: 0, y: 0 });
+  const isDraggingRef = useRef(false);
 
   const [dragTask, setDragTask] = useState<Task | null>(null);
   const [pendingDragTask, setPendingDragTask] = useState<Task | null>(null);
@@ -67,12 +68,10 @@ export const WeekView = ({
     dayIndex: number;
     hour: number;
   } | null>(null);
-  // Ghost preview for new task (tracks date/time changes in modal)
   const [ghostPreview, setGhostPreview] = useState<{
     dayIndex: number;
     hour: number;
   } | null>(null);
-  // Modal position state
   const [modalPosition, setModalPosition] = useState<{
     top: number;
     left: number;
@@ -83,7 +82,6 @@ export const WeekView = ({
     return Array.from({ length: 7 }, (_, i) => addDays(start, i));
   }, [currentDate]);
 
-  // Auto-scroll to current hour on mount
   useEffect(() => {
     if (scrollRef.current) {
       const currentHour = new Date().getHours();
@@ -92,186 +90,256 @@ export const WeekView = ({
     }
   }, []);
 
-  // Auto-scroll during drag using requestAnimationFrame for smooth scrolling
-  const startAutoScroll = useCallback(() => {
-    const scroll = () => {
-      if (!scrollRef.current) return;
+  // ✅ UNIFIED ANIMATION LOOP - handles both scrolling AND position updates
+  const updateDragState = useCallback(() => {
+    if (!isDraggingRef.current || !scrollRef.current) return;
 
-      const container = scrollRef.current;
-      const { top, bottom } = container.getBoundingClientRect();
-      const mouseY = mouseYRef.current;
+    const container = scrollRef.current;
+    const gridEl = container.querySelector(
+      "[data-calendar-grid]"
+    ) as HTMLElement;
+    if (!gridEl) return;
 
-      // Calculate scroll direction and speed based on distance from edge
-      if (mouseY < top + EDGE_SCROLL_THRESHOLD && mouseY > top - 100) {
-        // Scroll up - speed increases closer to edge
-        const distance = top + EDGE_SCROLL_THRESHOLD - mouseY;
-        const speed = Math.min(
-          EDGE_SCROLL_SPEED,
-          (distance / EDGE_SCROLL_THRESHOLD) * EDGE_SCROLL_SPEED
-        );
-        container.scrollTop -= speed;
-      } else if (
-        mouseY > bottom - EDGE_SCROLL_THRESHOLD &&
-        mouseY < bottom + 100
-      ) {
-        // Scroll down - speed increases closer to edge
-        const distance = mouseY - (bottom - EDGE_SCROLL_THRESHOLD);
-        const speed = Math.min(
-          EDGE_SCROLL_SPEED,
-          (distance / EDGE_SCROLL_THRESHOLD) * EDGE_SCROLL_SPEED
-        );
-        container.scrollTop += speed;
-      }
+    const scrollRect = container.getBoundingClientRect();
+    const gridRect = gridEl.getBoundingClientRect();
+    const mouseY = mouseRef.current.y;
+    const mouseX = mouseRef.current.x;
 
-      autoScrollRef.current = requestAnimationFrame(scroll);
+    // ========== AUTO SCROLL ==========
+    const EDGE_ZONE = 60; // pixels from edge to start scrolling
+    const MAX_SPEED = 25; // max scroll speed
+
+    let scrollSpeed = 0;
+
+    if (mouseY < scrollRect.top) {
+      // Mouse ABOVE container - scroll up fast
+      const distance = scrollRect.top - mouseY;
+      scrollSpeed = -Math.min(MAX_SPEED, 8 + (distance / 30) * MAX_SPEED);
+    } else if (mouseY < scrollRect.top + EDGE_ZONE) {
+      // Mouse in TOP edge zone - scroll up slower
+      const ratio = (scrollRect.top + EDGE_ZONE - mouseY) / EDGE_ZONE;
+      scrollSpeed = -ratio * 12;
+    } else if (mouseY > scrollRect.bottom) {
+      // Mouse BELOW container - scroll down fast
+      const distance = mouseY - scrollRect.bottom;
+      scrollSpeed = Math.min(MAX_SPEED, 8 + (distance / 30) * MAX_SPEED);
+    } else if (mouseY > scrollRect.bottom - EDGE_ZONE) {
+      // Mouse in BOTTOM edge zone - scroll down slower
+      const ratio = (mouseY - (scrollRect.bottom - EDGE_ZONE)) / EDGE_ZONE;
+      scrollSpeed = ratio * 12;
+    }
+
+    if (scrollSpeed !== 0) {
+      container.scrollTop += scrollSpeed;
+    }
+
+    // ========== UPDATE PREVIEW POSITION ==========
+    // Clamp mouse Y to visible area
+    const clampedY = Math.max(
+      scrollRect.top,
+      Math.min(scrollRect.bottom, mouseY)
+    );
+
+    // Calculate position relative to grid (accounting for current scroll)
+    const relativeY = clampedY - gridRect.top;
+    const relativeX = mouseX - gridRect.left;
+
+    const dayWidth = gridRect.width / 7;
+    const dayIndex = Math.min(6, Math.max(0, Math.floor(relativeX / dayWidth)));
+    const hour = Math.min(23, Math.max(0, Math.floor(relativeY / HOUR_HEIGHT)));
+
+    setDragPreview({ dayIndex, hour });
+  }, []);
+
+  // ✅ ANIMATION FRAME LOOP
+  useEffect(() => {
+    const animate = () => {
+      updateDragState();
+      rafRef.current = requestAnimationFrame(animate);
     };
 
-    autoScrollRef.current = requestAnimationFrame(scroll);
-  }, []);
-
-  const stopAutoScroll = useCallback(() => {
-    if (autoScrollRef.current) {
-      cancelAnimationFrame(autoScrollRef.current);
-      autoScrollRef.current = null;
-    }
-  }, []);
-
-  // Start/stop auto-scroll based on drag state
-  useEffect(() => {
-    const isDragging = !!dragTask || !!externalDragTask;
-    if (isDragging) {
-      startAutoScroll();
+    if (dragTask || externalDragTask) {
+      isDraggingRef.current = true;
+      rafRef.current = requestAnimationFrame(animate);
     } else {
-      stopAutoScroll();
+      isDraggingRef.current = false;
+      if (rafRef.current) {
+        cancelAnimationFrame(rafRef.current);
+        rafRef.current = null;
+      }
     }
-    return () => stopAutoScroll();
-  }, [dragTask, externalDragTask, startAutoScroll, stopAutoScroll]);
 
-  // Get position info from mouse event
-  // FIX: getBoundingClientRect already accounts for scroll position
-  // The grid element moves up in viewport when scrolled, so rect.top decreases
-  // No need to add scrollTop - that was causing the drift bug
-  const getSlotFromEvent = useCallback(
-    (e: React.MouseEvent | React.DragEvent, target?: HTMLElement) => {
-      const el = target || (e.currentTarget as HTMLElement);
-      const rect = el.getBoundingClientRect();
+    return () => {
+      if (rafRef.current) {
+        cancelAnimationFrame(rafRef.current);
+        rafRef.current = null;
+      }
+    };
+  }, [dragTask, externalDragTask, updateDragState]);
 
-      // Calculate position relative to grid element
-      // clientX/Y are viewport coords, rect.left/top are viewport coords of element
-      const x = e.clientX - rect.left;
-      const y = e.clientY - rect.top;
+  // Track mouse for external drag
+  useEffect(() => {
+    if (!externalDragTask) return;
 
-      // Calculate day and hour from grid coordinates
-      const dayWidth = rect.width / 7;
-      const dayIndex = Math.min(6, Math.max(0, Math.floor(x / dayWidth)));
-      const hour = Math.min(23, Math.max(0, Math.floor(y / HOUR_HEIGHT)));
+    const handleDragOver = (e: DragEvent) => {
+      mouseRef.current = { x: e.clientX, y: e.clientY };
+    };
 
-      return { dayIndex, hour };
-    },
-    []
-  );
+    document.addEventListener("dragover", handleDragOver);
+    return () => document.removeEventListener("dragover", handleDragOver);
+  }, [externalDragTask]);
 
-  // Internal drag handlers - use pending state to differentiate click vs drag
+  // Handle internal drag (mouse events)
+  useEffect(() => {
+    if (!dragTask && !pendingDragTask) return;
+
+    const handleMouseMove = (e: MouseEvent) => {
+      mouseRef.current = { x: e.clientX, y: e.clientY };
+
+      // Check if we should start dragging
+      if (pendingDragTask && dragStartPos && !dragTask) {
+        const dx = Math.abs(e.clientX - dragStartPos.x);
+        const dy = Math.abs(e.clientY - dragStartPos.y);
+
+        if (dx > DRAG_THRESHOLD || dy > DRAG_THRESHOLD) {
+          setDragTask(pendingDragTask);
+        }
+      }
+    };
+
+    const handleMouseUp = () => {
+      if (dragTask && dragPreview) {
+        const targetDay = days[dragPreview.dayIndex];
+        const newStartDate = setMinutes(setHours(targetDay, dragPreview.hour), 0);
+
+        // Calculate end date - preserve duration if task has scheduledEndDate, otherwise default 1 hour
+        let durationMs = 60 * 60 * 1000; // Default 1 hour
+        if (dragTask.scheduledDate && dragTask.scheduledEndDate) {
+          const originalStart = new Date(dragTask.scheduledDate).getTime();
+          const originalEnd = new Date(dragTask.scheduledEndDate).getTime();
+          durationMs = originalEnd - originalStart;
+          if (durationMs <= 0) durationMs = 60 * 60 * 1000; // Fallback to 1 hour
+        }
+        const newEndDate = new Date(newStartDate.getTime() + durationMs);
+
+        onUpdateTask(dragTask._id, {
+          scheduledDate: newStartDate.toISOString(),
+          scheduledEndDate: newEndDate.toISOString(),
+        });
+      }
+      setDragTask(null);
+      setPendingDragTask(null);
+      setDragStartPos(null);
+      setDragPreview(null);
+    };
+
+    document.addEventListener("mousemove", handleMouseMove, true);
+    document.addEventListener("mouseup", handleMouseUp, true);
+
+    return () => {
+      document.removeEventListener("mousemove", handleMouseMove, true);
+      document.removeEventListener("mouseup", handleMouseUp, true);
+    };
+  }, [
+    dragTask,
+    pendingDragTask,
+    dragStartPos,
+    dragPreview,
+    days,
+    onUpdateTask,
+  ]);
+
   const handleTaskMouseDown = useCallback(
     (e: React.MouseEvent, task: Task) => {
       e.preventDefault();
-      // Don't stop propagation yet - let click bubble if it's just a click
 
-      // Store the task and start position for potential drag
+      mouseRef.current = { x: e.clientX, y: e.clientY };
       setPendingDragTask(task);
       setDragStartPos({ x: e.clientX, y: e.clientY });
 
-      const hour = parseInt(task.scheduledTime || "0");
-      const dayIndex = days.findIndex((d) =>
-        isSameDay(d, new Date(task.scheduledDate!))
-      );
+      const taskDate = task.scheduledDate ? new Date(task.scheduledDate) : new Date();
+      const hour = taskDate.getHours();
+      const dayIndex = days.findIndex((d) => isSameDay(d, taskDate));
       setDragPreview({ dayIndex: Math.max(0, dayIndex), hour });
     },
     [days]
   );
 
-  const handleMouseMove = useCallback(
-    (e: React.MouseEvent) => {
-      // Track mouse Y for auto-scroll
-      mouseYRef.current = e.clientY;
-
-      // Check if we should upgrade pending drag to actual drag
-      if (pendingDragTask && dragStartPos && !dragTask) {
-        const dx = Math.abs(e.clientX - dragStartPos.x);
-        const dy = Math.abs(e.clientY - dragStartPos.y);
-
-        // Only start drag if mouse moved beyond threshold
-        if (dx > DRAG_THRESHOLD || dy > DRAG_THRESHOLD) {
-          setDragTask(pendingDragTask);
-        }
-      }
-
-      if (!dragTask || !scrollRef.current) return;
-
-      const gridEl = scrollRef.current.querySelector(
-        "[data-calendar-grid]"
-      ) as HTMLElement;
-      if (!gridEl) return;
-
-      const { dayIndex, hour } = getSlotFromEvent(e, gridEl);
-      setDragPreview({ dayIndex, hour });
-      // Auto-scroll is now handled by requestAnimationFrame loop
-    },
-    [dragTask, pendingDragTask, dragStartPos, getSlotFromEvent]
-  );
-
   const handleMouseUp = useCallback(() => {
-    if (dragTask && dragPreview) {
-      const targetDay = days[dragPreview.dayIndex];
-      const newDate = setMinutes(setHours(targetDay, dragPreview.hour), 0);
-
-      onUpdateTask(dragTask._id, {
-        scheduledDate: newDate.toISOString(),
-        scheduledTime: `${dragPreview.hour.toString().padStart(2, "0")}:00`,
-      });
+    if (!dragTask && pendingDragTask) {
+      setPendingDragTask(null);
+      setDragStartPos(null);
     }
-    // Clear all drag states
-    setDragTask(null);
-    setPendingDragTask(null);
-    setDragStartPos(null);
-    setDragPreview(null);
-  }, [dragTask, dragPreview, days, onUpdateTask]);
+  }, [dragTask, pendingDragTask]);
 
-  // External drag handlers (from sidebar)
   const handleDragOver = useCallback(
     (e: React.DragEvent) => {
-      if (!externalDragTask) return;
       e.preventDefault();
+
+      const hasTaskData = e.dataTransfer.types.includes("application/json");
+      if (!hasTaskData && !externalDragTask) {
+        e.dataTransfer.dropEffect = "none";
+        return;
+      }
+
       e.dataTransfer.dropEffect = "move";
-
-      // Track mouse Y for auto-scroll
-      mouseYRef.current = e.clientY;
-
-      const gridEl = scrollRef.current?.querySelector(
-        "[data-calendar-grid]"
-      ) as HTMLElement;
-      if (!gridEl) return;
-
-      const { dayIndex, hour } = getSlotFromEvent(e, gridEl);
-      setDragPreview({ dayIndex, hour });
+      mouseRef.current = { x: e.clientX, y: e.clientY };
     },
-    [externalDragTask, getSlotFromEvent]
+    [externalDragTask]
   );
 
   const handleDrop = useCallback(
     (e: React.DragEvent) => {
-      if (!externalDragTask || !dragPreview) return;
       e.preventDefault();
 
+      let taskToSchedule = externalDragTask;
+
+      if (!taskToSchedule) {
+        try {
+          const taskData = e.dataTransfer.getData("application/json");
+          if (taskData) {
+            taskToSchedule = JSON.parse(taskData) as Task;
+          }
+        } catch {
+          // Invalid data
+        }
+      }
+
+      if (!taskToSchedule || !dragPreview) {
+        setDragPreview(null);
+        return;
+      }
+
       const targetDay = days[dragPreview.dayIndex];
-      onExternalDrop?.(targetDay, dragPreview.hour);
+
+      if (!externalDragTask && taskToSchedule) {
+        const hour = dragPreview.hour;
+        const newStartDate = setMinutes(setHours(targetDay, hour), 0);
+
+        // Calculate end date - preserve duration if task has scheduledEndDate, otherwise default 1 hour
+        let durationMs = 60 * 60 * 1000; // Default 1 hour
+        if (taskToSchedule.scheduledDate && taskToSchedule.scheduledEndDate) {
+          const originalStart = new Date(taskToSchedule.scheduledDate).getTime();
+          const originalEnd = new Date(taskToSchedule.scheduledEndDate).getTime();
+          durationMs = originalEnd - originalStart;
+          if (durationMs <= 0) durationMs = 60 * 60 * 1000; // Fallback to 1 hour
+        }
+        const newEndDate = new Date(newStartDate.getTime() + durationMs);
+
+        onUpdateTask(taskToSchedule._id, {
+          scheduledDate: newStartDate.toISOString(),
+          scheduledEndDate: newEndDate.toISOString(),
+        });
+      } else {
+        onExternalDrop?.(targetDay, dragPreview.hour);
+      }
+
       setDragPreview(null);
     },
-    [externalDragTask, dragPreview, days, onExternalDrop]
+    [externalDragTask, dragPreview, days, onExternalDrop, onUpdateTask]
   );
 
-  // Calculate smart modal position (to the side of clicked slot)
-  const TIME_COLUMN_WIDTH = 56; // w-14 = 56px
+  const TIME_COLUMN_WIDTH = 56;
   const calculateModalPosition = useCallback(
     (dayIndex: number, hour: number) => {
       if (!gridRef.current || !scrollRef.current) return { top: 0, left: 0 };
@@ -280,28 +348,22 @@ export const WeekView = ({
       const scrollRect = scrollRef.current.getBoundingClientRect();
       const dayWidth = gridRect.width / 7;
 
-      // Calculate slot position - use absolute position within scroll container
-      // Add TIME_COLUMN_WIDTH since modal is positioned relative to scrollRef which includes time column
       const slotLeft = TIME_COLUMN_WIDTH + dayIndex * dayWidth;
       const slotTop = hour * HOUR_HEIGHT;
 
-      // Determine if modal should go left or right of the slot
       const slotCenterX = slotLeft + dayWidth / 2;
       const containerCenterX = scrollRect.width / 2;
 
       let modalLeft: number;
       if (slotCenterX > containerCenterX) {
-        // Slot is on right half, show modal on left
         modalLeft = Math.max(8, slotLeft - MODAL_WIDTH - 16);
       } else {
-        // Slot is on left half, show modal on right
         modalLeft = Math.min(
           scrollRect.width - MODAL_WIDTH - 8,
           slotLeft + dayWidth + 16
         );
       }
 
-      // Position modal next to the slot (clamped within reasonable bounds)
       const modalTop = Math.max(8, slotTop);
 
       return { top: modalTop, left: modalLeft };
@@ -309,7 +371,6 @@ export const WeekView = ({
     []
   );
 
-  // Slot click for quick add
   const handleSlotClick = useCallback(
     (e: React.MouseEvent, dayIndex: number, hour: number) => {
       if (dragTask) return;
@@ -330,13 +391,11 @@ export const WeekView = ({
     [days, dragTask, calculateModalPosition]
   );
 
-  // Handle preview change from QuickAddTask (when user changes date/time)
   const handlePreviewChange = useCallback(
     (newDate: Date, newTime: string) => {
       const newDayIndex = days.findIndex((d) => isSameDay(d, newDate));
       const newHour = parseInt(newTime.split(":")[0]);
 
-      // Only update ghost if date is in current week
       if (newDayIndex >= 0) {
         setGhostPreview({ dayIndex: newDayIndex, hour: newHour });
       } else {
@@ -347,20 +406,36 @@ export const WeekView = ({
   );
 
   const handleQuickAddSave = useCallback(
-    (title: string, project?: string, date?: Date, time?: string) => {
+    (title: string, project?: string, date?: Date, time?: string, endTime?: string) => {
       if (!quickAddSlot) return;
 
       const finalDate = date || quickAddSlot.date;
       const finalTime = time || quickAddSlot.time;
 
+      // Parse start time and create start date
+      const startHour = parseInt(finalTime.split(":")[0]);
+      const startMinutes = parseInt(finalTime.split(":")[1] || "0");
+      const startDate = setMinutes(setHours(finalDate, startHour), startMinutes);
+
+      // Calculate end date - use provided endTime or default to +1 hour
+      let endDate: Date;
+      if (endTime) {
+        const endHour = parseInt(endTime.split(":")[0]);
+        const endMinutes = parseInt(endTime.split(":")[1] || "0");
+        endDate = setMinutes(setHours(finalDate, endHour), endMinutes);
+        // Handle overnight case
+        if (endDate <= startDate) {
+          endDate = addDays(endDate, 1);
+        }
+      } else {
+        endDate = new Date(startDate.getTime() + 60 * 60 * 1000); // +1 hour
+      }
+
       onCreateTask({
         title,
         project,
-        scheduledDate: setMinutes(
-          setHours(finalDate, parseInt(finalTime.split(":")[0])),
-          0
-        ).toISOString(),
-        scheduledTime: finalTime,
+        scheduledDate: startDate.toISOString(),
+        scheduledEndDate: endDate.toISOString(),
         status: "todo",
         isImportant: true,
         isUrgent: false,
@@ -382,13 +457,10 @@ export const WeekView = ({
     <div
       ref={containerRef}
       className="flex flex-col h-full bg-white select-none"
-      onMouseMove={handleMouseMove}
       onMouseUp={handleMouseUp}
-      onMouseLeave={handleMouseUp}
       onDragOver={handleDragOver}
       onDrop={handleDrop}
     >
-      {/* Day Headers */}
       <div className="flex border-b border-slate-200 bg-white sticky top-0 z-20 shrink-0">
         <div className="w-14 shrink-0" />
         {days.map((day, idx) => (
@@ -396,7 +468,6 @@ export const WeekView = ({
             key={day.toString()}
             className={cn(
               "flex-1 py-3 text-center border-l border-slate-100 transition-colors",
-              // Soft blue highlight for active drop target
               dragPreview?.dayIndex === idx && isDragging && "bg-blue-50/70",
               ghostPreview?.dayIndex === idx && !isDragging && "bg-blue-50/40"
             )}
@@ -407,7 +478,6 @@ export const WeekView = ({
             <div
               className={cn(
                 "text-lg font-bold w-9 h-9 flex items-center justify-center mx-auto rounded-full mt-1 transition-colors",
-                // Today indicator - professional blue instead of harsh purple/teal
                 isSameDay(day, new Date())
                   ? "bg-blue-600 text-white shadow-sm"
                   : "text-slate-700 hover:bg-slate-100"
@@ -419,13 +489,11 @@ export const WeekView = ({
         ))}
       </div>
 
-      {/* Scrollable Grid */}
       <div
         ref={scrollRef}
         className="flex-1 overflow-y-auto overflow-x-hidden relative"
       >
         <div className="flex relative" style={{ height: 24 * HOUR_HEIGHT }}>
-          {/* Time Column */}
           <div className="w-14 shrink-0 relative">
             {HOURS.map((hour) => (
               <div
@@ -440,9 +508,7 @@ export const WeekView = ({
             ))}
           </div>
 
-          {/* Grid Area */}
           <div ref={gridRef} data-calendar-grid className="flex-1 relative">
-            {/* Hour Lines */}
             {HOURS.map((hour) => (
               <div
                 key={hour}
@@ -451,20 +517,17 @@ export const WeekView = ({
               />
             ))}
 
-            {/* Day Columns with Slots */}
             <div className="absolute inset-0 flex">
               {days.map((day, dayIdx) => (
                 <div
                   key={day.toString()}
                   className={cn(
                     "flex-1 border-l border-slate-100 relative",
-                    // Soft blue highlight for active drop column
                     dragPreview?.dayIndex === dayIdx &&
                       isDragging &&
                       "bg-blue-50/40"
                   )}
                 >
-                  {/* Hour Slots */}
                   {HOURS.map((hour) => (
                     <div
                       key={hour}
@@ -486,7 +549,6 @@ export const WeekView = ({
                         height: HOUR_HEIGHT,
                       }}
                     >
-                      {/* Quick add button on hover */}
                       {hoverSlot?.dayIndex === dayIdx &&
                         hoverSlot?.hour === hour &&
                         !isDragging &&
@@ -498,7 +560,6 @@ export const WeekView = ({
                     </div>
                   ))}
 
-                  {/* Tasks */}
                   {tasks
                     .filter(
                       (t) =>
@@ -506,8 +567,26 @@ export const WeekView = ({
                         isSameDay(new Date(t.scheduledDate), day)
                     )
                     .map((task) => {
-                      const hour = parseInt(task.scheduledTime || "0");
+                      const taskStartDate = new Date(task.scheduledDate!);
+                      const startHour = taskStartDate.getHours();
+                      const startMinutes = taskStartDate.getMinutes();
                       const isBeingDragged = dragTask?._id === task._id;
+
+                      // Calculate duration in hours based on scheduledEndDate
+                      let durationHours = 1; // Default 1 hour
+                      if (task.scheduledEndDate) {
+                        const taskEndDate = new Date(task.scheduledEndDate);
+                        const durationMs = taskEndDate.getTime() - taskStartDate.getTime();
+                        durationHours = durationMs / (60 * 60 * 1000);
+                        if (durationHours <= 0) durationHours = 1; // Fallback
+                      }
+
+                      const taskHeight = Math.max(HOUR_HEIGHT * durationHours - 2, HOUR_HEIGHT * 0.5);
+                      const topPosition = (startHour + startMinutes / 60) * HOUR_HEIGHT + 1;
+
+                      // Format time strings for display
+                      const startTimeStr = format(taskStartDate, "HH:mm");
+                      const endTimeStr = task.scheduledEndDate ? format(new Date(task.scheduledEndDate), "HH:mm") : null;
 
                       return (
                         <motion.div
@@ -521,11 +600,8 @@ export const WeekView = ({
                             }
                           }}
                           className={cn(
-                            // Google Calendar style: solid backgrounds, small rounded corners
                             "absolute left-1 right-1 rounded px-2 py-1.5 cursor-grab active:cursor-grabbing",
-                            // Subtle border for definition against grid
                             "border border-white/20 transition-all duration-100 overflow-hidden",
-                            // Softer color backgrounds - easier on the eyes
                             task.isUrgent && task.isImportant
                               ? "bg-rose-400 hover:bg-rose-500"
                               : task.isImportant
@@ -537,25 +613,23 @@ export const WeekView = ({
                               "opacity-40 pointer-events-none scale-[0.98]"
                           )}
                           style={{
-                            top: hour * HOUR_HEIGHT + 1,
-                            height: HOUR_HEIGHT - 2,
+                            top: topPosition,
+                            height: taskHeight,
                           }}
                           whileHover={{ scale: 1.01 }}
                           whileTap={{ scale: 0.99 }}
                         >
-                          {/* White text on solid backgrounds */}
                           <p className="text-xs font-medium text-white truncate leading-tight">
                             {task.title}
                           </p>
                           <p className="text-[10px] text-white/80 mt-0.5 truncate">
-                            {task.scheduledTime}
+                            {startTimeStr}{endTimeStr && ` - ${endTimeStr}`}
                             {task.project && ` · ${task.project}`}
                           </p>
                         </motion.div>
                       );
                     })}
 
-                  {/* Current Time Indicator */}
                   {isSameDay(day, new Date()) && (
                     <div
                       className="absolute left-0 right-0 z-10 pointer-events-none"
@@ -576,16 +650,15 @@ export const WeekView = ({
               ))}
             </div>
 
-            {/* Drag Preview - Semi-transparent solid like Google Calendar */}
             <AnimatePresence>
               {isDragging && dragPreview && (
                 <motion.div
                   initial={{ opacity: 0 }}
                   animate={{ opacity: 0.7 }}
                   exit={{ opacity: 0 }}
+                  transition={{ duration: 0.1 }}
                   className={cn(
                     "absolute rounded pointer-events-none z-20",
-                    // Semi-transparent softer backgrounds
                     externalDragTask
                       ? "bg-sky-400"
                       : dragTask?.isUrgent && dragTask?.isImportant
@@ -615,7 +688,6 @@ export const WeekView = ({
               )}
             </AnimatePresence>
 
-            {/* Ghost Preview for New Task - Semi-transparent blue */}
             <AnimatePresence>
               {ghostPreview && !isDragging && quickAddSlot && (
                 <motion.div
@@ -642,7 +714,6 @@ export const WeekView = ({
           </div>
         </div>
 
-        {/* Quick Add Popup - Positioned to side of slot */}
         <AnimatePresence>
           {quickAddSlot && !isDragging && (
             <div

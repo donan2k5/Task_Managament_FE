@@ -22,7 +22,7 @@ interface QuickAddTaskProps {
   date: Date;
   time: string;
   position: { top: number; left: number };
-  onSave: (title: string, project?: string, date?: Date, time?: string) => void;
+  onSave: (title: string, project?: string, date?: Date, time?: string, endTime?: string) => void;
   onCancel: () => void;
   onPreviewChange?: (date: Date, time: string) => void;
   projects: Project[];
@@ -94,7 +94,10 @@ export const QuickAddTask = ({
 
   const handleSubmit = () => {
     if (!title.trim()) return;
-    onSave(title.trim(), project || undefined, selectedDate, selectedTime);
+    // Calculate end time (+1 hour from start)
+    const startHour = parseInt(selectedTime.split(":")[0]);
+    const calculatedEndTime = `${((startHour + 1) % 24).toString().padStart(2, "0")}:00`;
+    onSave(title.trim(), project || undefined, selectedDate, selectedTime, calculatedEndTime);
   };
 
   const handleKeyDown = (e: React.KeyboardEvent) => {

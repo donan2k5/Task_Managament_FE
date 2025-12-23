@@ -121,10 +121,11 @@ export const TaskDetailPopover = ({
         animate={{ opacity: 1, scale: 1, y: 0 }}
         exit={{ opacity: 0, scale: 0.95, y: -10 }}
         transition={{ type: "spring", damping: 25, stiffness: 400 }}
-        className="fixed z-[70] w-[320px] bg-white rounded-xl shadow-2xl border border-slate-200 overflow-hidden"
+        className="fixed z-[70] w-[340px] bg-white rounded-xl shadow-2xl border border-slate-200 overflow-hidden flex flex-col"
         style={{
           left: adjustedPosition.x,
           top: adjustedPosition.y,
+          maxHeight: "min(500px, calc(100vh - 100px))",
         }}
       >
         {/* Header with action buttons */}
@@ -156,11 +157,11 @@ export const TaskDetailPopover = ({
           </Button>
         </div>
 
-        {/* Content */}
-        <div className="p-4">
+        {/* Content - Scrollable */}
+        <div className="flex-1 overflow-y-auto p-4">
           {/* Title with color indicator */}
           <div className="flex items-start gap-3">
-            <div className={cn("w-3 h-3 rounded-sm mt-1 shrink-0", getTaskColor())} />
+            <div className={cn("w-3 h-3 rounded-sm mt-1.5 shrink-0", getTaskColor())} />
             <div className="flex-1 min-w-0">
               <h3 className="text-base font-semibold text-slate-800 leading-snug">
                 {task.title}
@@ -171,15 +172,14 @@ export const TaskDetailPopover = ({
           {/* Date & Time */}
           {task.scheduledDate && (
             <div className="flex items-center gap-2 mt-4 text-sm text-slate-600">
-              <CalendarIcon className="w-4 h-4 text-slate-400" />
+              <CalendarIcon className="w-4 h-4 text-slate-400 shrink-0" />
               <span>
                 {format(new Date(task.scheduledDate), "EEEE, MMMM d")}
-                {task.scheduledTime && (
-                  <span className="mx-1.5">·</span>
-                )}
-                {task.scheduledTime && (
-                  <span>{task.scheduledTime}</span>
-                )}
+                <span className="mx-1.5">·</span>
+                <span>
+                  {format(new Date(task.scheduledDate), "HH:mm")}
+                  {task.scheduledEndDate && ` - ${format(new Date(task.scheduledEndDate), "HH:mm")}`}
+                </span>
               </span>
             </div>
           )}
@@ -187,7 +187,7 @@ export const TaskDetailPopover = ({
           {/* Deadline */}
           {task.deadline && (
             <div className="flex items-center gap-2 mt-2 text-sm text-slate-600">
-              <Clock className="w-4 h-4 text-slate-400" />
+              <Clock className="w-4 h-4 text-slate-400 shrink-0" />
               <span>Due: {format(new Date(task.deadline), "MMM d, yyyy")}</span>
             </div>
           )}
@@ -195,32 +195,36 @@ export const TaskDetailPopover = ({
           {/* Project */}
           {task.project && (
             <div className="flex items-center gap-2 mt-2 text-sm text-slate-600">
-              <Folder className="w-4 h-4 text-slate-400" />
+              <Folder className="w-4 h-4 text-slate-400 shrink-0" />
               <span>{task.project}</span>
             </div>
           )}
 
           {/* Priority badges */}
-          <div className="flex items-center gap-2 mt-4">
-            {task.isUrgent && (
-              <span className="inline-flex items-center gap-1 text-xs font-medium text-red-600 bg-red-50 px-2 py-1 rounded-md">
-                <AlertCircle className="w-3 h-3" />
-                Urgent
-              </span>
-            )}
-            {task.isImportant && (
-              <span className="inline-flex items-center gap-1 text-xs font-medium text-amber-600 bg-amber-50 px-2 py-1 rounded-md">
-                <Flag className="w-3 h-3" />
-                Important
-              </span>
-            )}
-          </div>
+          {(task.isUrgent || task.isImportant) && (
+            <div className="flex items-center gap-2 mt-4">
+              {task.isUrgent && (
+                <span className="inline-flex items-center gap-1 text-xs font-medium text-red-600 bg-red-50 px-2 py-1 rounded-md">
+                  <AlertCircle className="w-3 h-3" />
+                  Urgent
+                </span>
+              )}
+              {task.isImportant && (
+                <span className="inline-flex items-center gap-1 text-xs font-medium text-amber-600 bg-amber-50 px-2 py-1 rounded-md">
+                  <Flag className="w-3 h-3" />
+                  Important
+                </span>
+              )}
+            </div>
+          )}
 
-          {/* Description preview */}
+          {/* Description - Full display with scroll */}
           {task.description && (
-            <p className="mt-4 text-sm text-slate-500 line-clamp-2">
-              {task.description}
-            </p>
+            <div className="mt-4 pt-4 border-t border-slate-100">
+              <p className="text-sm text-slate-600 whitespace-pre-wrap leading-relaxed">
+                {task.description}
+              </p>
+            </div>
           )}
         </div>
 
