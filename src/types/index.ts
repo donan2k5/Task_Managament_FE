@@ -66,6 +66,53 @@ export interface HeaderStats {
   weeklyData: number[];
 }
 
+// ==================== Authentication Types ====================
+
+// User data returned from auth endpoints
+export interface AuthUser {
+  id: string;
+  email: string;
+  name: string;
+  avatar?: string;
+  authMethods: ("local" | "google")[];
+  googleConnected: boolean;
+}
+
+// Response from login/register/refresh endpoints
+export interface AuthResponse {
+  accessToken: string;
+  refreshToken: string;
+  user: AuthUser;
+}
+
+// Error response format
+export interface ErrorResponse {
+  statusCode: number;
+  message: string | string[];
+  error: string;
+}
+
+// Request DTOs
+export interface RegisterDto {
+  name: string;
+  email: string;
+  password: string;
+}
+
+export interface LoginDto {
+  email: string;
+  password: string;
+}
+
+export interface RefreshTokenDto {
+  refreshToken: string;
+}
+
+export interface SetPasswordDto {
+  password: string;
+  confirmPassword: string;
+}
+
 // Google Auth Types
 export interface GoogleAuthStatus {
   isConnected: boolean;

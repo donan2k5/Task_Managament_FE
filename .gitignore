@@ -24,7 +24,6 @@ dist-ssr
 *.sw?
 
 # Dependency directories
-CLAUDE.md
 .claude/
 .serena/
 

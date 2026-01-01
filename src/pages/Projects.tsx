@@ -35,6 +35,15 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
+import { Label } from "@/components/ui/label";
 import { projectService } from "@/services/project.service";
 import { toast } from "sonner";
 import { taskService } from "@/services/task.service";
@@ -58,6 +67,13 @@ const Projects = () => {
   const [searchQuery, setSearchQuery] = useState("");
   const [projectToDelete, setProjectToDelete] = useState<Project | null>(null);
   const [isDeletingProject, setIsDeletingProject] = useState(false);
+
+  // Create project dialog state
+  const [showCreateDialog, setShowCreateDialog] = useState(false);
+  const [isCreatingProject, setIsCreatingProject] = useState(false);
+  const [newProjectName, setNewProjectName] = useState("");
+  const [newProjectDescription, setNewProjectDescription] = useState("");
+  const [newProjectColor, setNewProjectColor] = useState("#8B5CF6");
 
   // Load Projects from API
   useEffect(() => {
@@ -183,6 +199,44 @@ const Projects = () => {
     setProjectToDelete(project);
   };
 
+  // Handle create new project
+  const handleCreateProject = async () => {
+    if (!newProjectName.trim()) {
+      toast.error("Project name is required");
+      return;
+    }
+
+    setIsCreatingProject(true);
+    try {
+      const newProject = await projectService.create({
+        name: newProjectName.trim(),
+        description: newProjectDescription.trim() || undefined,
+        color: newProjectColor,
+      });
+      setProjectList((prev) => [
+        ...prev,
+        { ...newProject, animatedProgress: 0 },
+      ]);
+      toast.success("Project created successfully");
+      setShowCreateDialog(false);
+      setNewProjectName("");
+      setNewProjectDescription("");
+      setNewProjectColor("#8B5CF6");
+    } catch (error) {
+      console.error("Error creating project:", error);
+      toast.error("Failed to create project");
+    } finally {
+      setIsCreatingProject(false);
+    }
+  };
+
+  const handleOpenCreateDialog = () => {
+    setNewProjectName("");
+    setNewProjectDescription("");
+    setNewProjectColor("#8B5CF6");
+    setShowCreateDialog(true);
+  };
+
   if (loading)
     return (
       <DashboardLayout>
@@ -217,7 +271,7 @@ const Projects = () => {
                     Track progress across all your projects
                   </p>
                 </div>
-                <Button className="gap-2">
+                <Button className="gap-2" onClick={handleOpenCreateDialog}>
                   <Plus className="w-4 h-4" /> New Project
                 </Button>
               </motion.header>
@@ -329,6 +383,7 @@ const Projects = () => {
                   animate={{ opacity: 1, y: 0 }}
                   transition={{ delay: projectList.length * 0.1, duration: 0.4 }}
                   className="border-2 border-dashed border-border rounded-xl p-6 flex flex-col items-center justify-center min-h-[200px] cursor-pointer hover:border-primary/50 hover:bg-muted/30 transition-all"
+                  onClick={handleOpenCreateDialog}
                 >
                   <div className="w-12 h-12 rounded-full bg-muted flex items-center justify-center mb-3">
                     <Plus className="w-6 h-6 text-muted-foreground" />
@@ -571,6 +626,90 @@ const Projects = () => {
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+
+      {/* Create Project Dialog */}
+      <Dialog open={showCreateDialog} onOpenChange={setShowCreateDialog}>
+        <DialogContent className="sm:max-w-[425px]">
+          <DialogHeader>
+            <DialogTitle>Create New Project</DialogTitle>
+            <DialogDescription>
+              Add a new project to organize your tasks.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="grid gap-4 py-4">
+            <div className="grid gap-2">
+              <Label htmlFor="project-name">Project Name *</Label>
+              <Input
+                id="project-name"
+                value={newProjectName}
+                onChange={(e) => setNewProjectName(e.target.value)}
+                placeholder="Enter project name..."
+                disabled={isCreatingProject}
+              />
+            </div>
+            <div className="grid gap-2">
+              <Label htmlFor="project-description">Description</Label>
+              <Input
+                id="project-description"
+                value={newProjectDescription}
+                onChange={(e) => setNewProjectDescription(e.target.value)}
+                placeholder="Enter project description..."
+                disabled={isCreatingProject}
+              />
+            </div>
+            <div className="grid gap-2">
+              <Label htmlFor="project-color">Color</Label>
+              <div className="flex items-center gap-3">
+                <input
+                  type="color"
+                  id="project-color"
+                  value={newProjectColor}
+                  onChange={(e) => setNewProjectColor(e.target.value)}
+                  className="w-10 h-10 rounded-lg cursor-pointer border border-border"
+                  disabled={isCreatingProject}
+                />
+                <div className="flex gap-2">
+                  {["#8B5CF6", "#EC4899", "#10B981", "#F59E0B", "#3B82F6", "#EF4444"].map((color) => (
+                    <button
+                      key={color}
+                      type="button"
+                      onClick={() => setNewProjectColor(color)}
+                      className={cn(
+                        "w-8 h-8 rounded-full transition-all",
+                        newProjectColor === color && "ring-2 ring-offset-2 ring-primary"
+                      )}
+                      style={{ backgroundColor: color }}
+                      disabled={isCreatingProject}
+                    />
+                  ))}
+                </div>
+              </div>
+            </div>
+          </div>
+          <DialogFooter>
+            <Button
+              variant="outline"
+              onClick={() => setShowCreateDialog(false)}
+              disabled={isCreatingProject}
+            >
+              Cancel
+            </Button>
+            <Button
+              onClick={handleCreateProject}
+              disabled={isCreatingProject || !newProjectName.trim()}
+            >
+              {isCreatingProject ? (
+                <>
+                  <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                  Creating...
+                </>
+              ) : (
+                "Create Project"
+              )}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </DashboardLayout>
   );
 };

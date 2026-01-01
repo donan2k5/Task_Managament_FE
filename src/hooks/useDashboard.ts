@@ -1,14 +1,23 @@
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useRef } from "react";
 import { dashboardService } from "@/services/dashboard.service";
 import { projectService } from "@/services/project.service"; // Import project service
 import { useToast } from "@/hooks/use-toast";
+import { authService } from "@/services/auth.service";
+import { tokenManager } from "@/services/tokenManager";
 
 export const useDashboard = () => {
   const [data, setData] = useState<any>(null);
   const [loading, setLoading] = useState(true);
   const { toast } = useToast();
+  const hasFetched = useRef(false);
 
   const loadData = useCallback(async () => {
+    // Only fetch if authenticated
+    if (!authService.isAuthenticated()) {
+      setLoading(false);
+      return;
+    }
+
     try {
       setLoading(true);
       const [result] = await Promise.all([
@@ -16,6 +25,7 @@ export const useDashboard = () => {
         new Promise((resolve) => setTimeout(resolve, 0)),
       ]);
       setData(result);
+      hasFetched.current = true;
     } catch (error) {
       console.error("Dashboard load failed", error);
     } finally {
@@ -23,8 +33,26 @@ export const useDashboard = () => {
     }
   }, []);
 
+  // Initial fetch attempt
   useEffect(() => {
     loadData();
+  }, [loadData]);
+
+  // Subscribe to token changes - re-fetch when token becomes available
+  useEffect(() => {
+    const unsubscribe = tokenManager.subscribe((token) => {
+      // If token just became available and we haven't fetched yet, fetch now
+      if (token && !hasFetched.current) {
+        loadData();
+      }
+      // If token is cleared, reset state
+      if (!token) {
+        setData(null);
+        hasFetched.current = false;
+      }
+    });
+
+    return unsubscribe;
   }, [loadData]);
 
   // --- HÀM ADD PROJECT MỚI ---

@@ -1,4 +1,4 @@
-import { useState, useMemo, forwardRef, useCallback } from "react";
+import { useState, useMemo, forwardRef, useCallback, useEffect, useRef } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { MoreHorizontal, Clock, CheckCircle2, Circle, Loader2 } from "lucide-react";
 import { format } from "date-fns";
@@ -14,6 +14,39 @@ interface TasksCardProps {
 export const TasksCard = ({ tasks: initialTasks, onTaskUpdated }: TasksCardProps) => {
   const [localTasks, setLocalTasks] = useState<Task[]>(initialTasks);
   const [loadingTaskIds, setLoadingTaskIds] = useState<Set<string>>(new Set());
+
+  // Track locally modified task IDs to preserve during sync
+  const modifiedTaskIds = useRef<Set<string>>(new Set());
+
+  // Smart sync: preserve locally modified tasks, update others
+  useEffect(() => {
+    setLocalTasks((prevLocal) => {
+      // If no local modifications, just use new data
+      if (modifiedTaskIds.current.size === 0) {
+        return initialTasks;
+      }
+
+      // Merge: keep locally modified tasks, use new data for others
+      const newTaskMap = new Map(initialTasks.map(t => [t._id, t]));
+      const localModifiedMap = new Map(
+        prevLocal.filter(t => modifiedTaskIds.current.has(t._id)).map(t => [t._id, t])
+      );
+
+      // Combine: prioritize local modifications
+      const merged = initialTasks.map(t =>
+        localModifiedMap.has(t._id) ? localModifiedMap.get(t._id)! : t
+      );
+
+      // Add any locally modified tasks that aren't in new data
+      prevLocal.forEach(t => {
+        if (modifiedTaskIds.current.has(t._id) && !newTaskMap.has(t._id)) {
+          merged.push(t);
+        }
+      });
+
+      return merged;
+    });
+  }, [initialTasks]);
 
   // Logic lọc và phân loại task
   const { todoTasks, todayAccomplished } = useMemo(() => {
@@ -49,16 +82,22 @@ export const TasksCard = ({ tasks: initialTasks, onTaskUpdated }: TasksCardProps
     const task = localTasks.find((t) => t._id === taskId);
     if (!task) return;
 
+    // Mark as locally modified to preserve during sync
+    modifiedTaskIds.current.add(taskId);
+
     // Add to loading state
     setLoadingTaskIds((prev) => new Set(prev).add(taskId));
 
-    // Optimistic update
+    // Optimistic update with updatedAt set to now
     const newCompleted = !task.completed;
     const newStatus = newCompleted ? "done" : "todo";
+    const now = new Date().toISOString();
 
     setLocalTasks((prev) =>
       prev.map((t) =>
-        t._id === taskId ? { ...t, completed: newCompleted, status: newStatus } : t
+        t._id === taskId
+          ? { ...t, completed: newCompleted, status: newStatus, updatedAt: now }
+          : t
       )
     );
 
@@ -77,6 +116,11 @@ export const TasksCard = ({ tasks: initialTasks, onTaskUpdated }: TasksCardProps
       onTaskUpdated?.(updatedTask);
 
       toast.success(newCompleted ? "Task completed!" : "Task restored");
+
+      // Clear modification flag after successful sync (delay to handle any parent re-renders)
+      setTimeout(() => {
+        modifiedTaskIds.current.delete(taskId);
+      }, 2000);
     } catch (error) {
       // Rollback on error
       setLocalTasks((prev) =>
@@ -84,6 +128,7 @@ export const TasksCard = ({ tasks: initialTasks, onTaskUpdated }: TasksCardProps
           t._id === taskId ? { ...t, completed: task.completed, status: task.status } : t
         )
       );
+      modifiedTaskIds.current.delete(taskId);
       toast.error("Failed to update task");
       console.error("Error updating task:", error);
     } finally {
