@@ -6,6 +6,8 @@ import {
   Calendar,
   Clock,
   Loader2,
+  CheckCircle2,
+  Circle,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useTasks } from "@/hooks/useTasks";
@@ -216,14 +218,15 @@ export const CalendarCard = () => {
 // --- SUB COMPONENTS ---
 
 const EventItem = ({ task }: { task: Task }) => {
-  const displayTime = useMemo(() => {
+  const startTime = useMemo(() => {
     if (!task.scheduledDate) return "";
-    const startTime = formatTime(task.scheduledDate);
-    if (task.scheduledEndDate) {
-      return `${startTime} - ${formatTime(task.scheduledEndDate)}`;
-    }
-    return startTime;
-  }, [task.scheduledDate, task.scheduledEndDate]);
+    return formatTime(task.scheduledDate);
+  }, [task.scheduledDate]);
+
+  const endTime = useMemo(() => {
+    if (!task.scheduledEndDate) return "";
+    return formatTime(task.scheduledEndDate);
+  }, [task.scheduledEndDate]);
 
   return (
     <motion.div
@@ -231,12 +234,23 @@ const EventItem = ({ task }: { task: Task }) => {
       initial={{ opacity: 0, x: -10 }}
       animate={{ opacity: 1, x: 0 }}
       exit={{ opacity: 0, x: 10 }}
-      className="group relative flex gap-3 p-3.5 rounded-xl bg-white border border-slate-100 shadow-sm hover:shadow-md hover:border-indigo-100 transition-all cursor-pointer"
+      className="group relative flex gap-4 p-4 rounded-xl bg-white border border-slate-100 shadow-sm hover:shadow-md hover:border-indigo-100 transition-all cursor-pointer"
     >
-      <div className="flex flex-col items-center min-w-[60px] pt-0.5">
-        <span className="text-xs font-bold text-slate-800">{displayTime}</span>
-        <div className="w-[2px] h-full bg-slate-100 my-1.5 group-hover:bg-indigo-200 transition-colors rounded-full" />
+      {/* Time column - vertical */}
+      <div className="flex flex-col items-center min-w-[50px] text-center">
+        <span className="text-sm font-bold text-slate-700">{startTime}</span>
+        {endTime && (
+          <>
+            <div className="w-px h-3 bg-slate-200 my-1" />
+            <span className="text-xs text-slate-400">{endTime}</span>
+          </>
+        )}
       </div>
+
+      {/* Divider */}
+      <div className="w-px bg-gradient-to-b from-indigo-200 via-indigo-400 to-indigo-200 rounded-full" />
+
+      {/* Task content */}
       <div className="flex-1 min-w-0">
         <div className="flex items-center gap-1.5 mb-1">
           <span
@@ -245,17 +259,26 @@ const EventItem = ({ task }: { task: Task }) => {
               task.isUrgent ? "bg-rose-500" : "bg-indigo-500"
             )}
           />
-          <span className="text-[9px] font-bold text-slate-400 uppercase tracking-wider">
-            {task.project || "General"}
+          <span className="text-[10px] font-bold text-indigo-500 uppercase tracking-wider">
+            {task.project || "Inbox"}
           </span>
         </div>
-        <h4 className="text-sm font-bold text-slate-900 leading-snug group-hover:text-indigo-700 transition-colors truncate">
+        <h4 className="text-sm font-semibold text-slate-900 leading-snug group-hover:text-indigo-700 transition-colors line-clamp-2">
           {task.title}
         </h4>
-        <div className="flex items-center gap-2 mt-1 text-[10px] text-slate-500">
-          <span className="flex items-center gap-1 bg-slate-50 px-1.5 py-0.5 rounded border border-slate-200">
-            <Clock className="w-3 h-3 text-indigo-500" />{" "}
-            {task.status || "Todo"}
+        <div className="flex items-center gap-2 mt-2">
+          <span className={cn(
+            "flex items-center gap-1 text-[10px] font-medium px-2 py-0.5 rounded-full",
+            task.status === "done"
+              ? "bg-emerald-50 text-emerald-600"
+              : "bg-slate-100 text-slate-500"
+          )}>
+            {task.status === "done" ? (
+              <CheckCircle2 className="w-3 h-3" />
+            ) : (
+              <Circle className="w-3 h-3" />
+            )}
+            {task.status || "todo"}
           </span>
         </div>
       </div>

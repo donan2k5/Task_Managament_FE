@@ -1,38 +1,70 @@
-import { useState, useEffect, useCallback, useMemo } from "react";
+import { useState, useEffect, useCallback, useMemo, useRef } from "react";
 import { Task } from "@/types/index";
 import { taskService } from "@/services/task.service";
 import { useToast } from "@/hooks/use-toast";
+import { authService } from "@/services/auth.service";
+import { tokenManager } from "@/services/tokenManager";
 
 export const useTasks = () => {
   const [tasks, setTasks] = useState<Task[]>([]);
   const [calendarTasks, setCalendarTasks] = useState<Task[]>([]);
   const [loading, setLoading] = useState(true);
   const { toast } = useToast();
+  const hasFetched = useRef(false);
 
   // Fetch All Tasks
   const fetchTasks = useCallback(async () => {
+    // Only fetch if authenticated
+    if (!authService.isAuthenticated()) {
+      setLoading(false);
+      return;
+    }
+
     try {
       setLoading(true);
       const data = await taskService.getAll();
       setTasks(data);
+      hasFetched.current = true;
     } catch (err: any) {
-      toast({
-        variant: "destructive",
-        title: "Load error",
-        description: err.message,
-      });
+      // Don't show error toast for auth errors
+      if (err?.response?.status !== 401) {
+        toast({
+          variant: "destructive",
+          title: "Load error",
+          description: err.message,
+        });
+      }
     } finally {
       setLoading(false);
     }
   }, [toast]);
 
+  // Initial fetch attempt
   useEffect(() => {
     fetchTasks();
   }, [fetchTasks]);
 
-  // Derived: Scheduled tasks (have scheduledDate)
+  // Subscribe to token changes - re-fetch when token becomes available
+  useEffect(() => {
+    const unsubscribe = tokenManager.subscribe((token) => {
+      // If token just became available and we haven't fetched yet, fetch now
+      if (token && !hasFetched.current) {
+        fetchTasks();
+      }
+      // If token is cleared, reset state
+      if (!token) {
+        setTasks([]);
+        setCalendarTasks([]);
+        hasFetched.current = false;
+      }
+    });
+
+    return unsubscribe;
+  }, [fetchTasks]);
+
+  // Derived: Scheduled tasks (have scheduledDate) - includes done tasks for calendar view
   const scheduledTasks = useMemo(
-    () => tasks.filter((t) => t.scheduledDate && t.status !== "done"),
+    () => tasks.filter((t) => t.scheduledDate),
     [tasks]
   );
 

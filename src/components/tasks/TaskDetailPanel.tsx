@@ -1,4 +1,4 @@
-import { useState, useEffect, useMemo } from "react";
+import { useState, useEffect, useMemo, useRef } from "react";
 import { motion } from "framer-motion";
 import {
   Calendar as CalendarIcon,
@@ -175,6 +175,7 @@ export const TaskDetailPanel = ({
   const [endTime, setEndTime] = useState<string>("");
   const [deadlineDate, setDeadlineDate] = useState<Date | undefined>(undefined);
   const [deadlineTime, setDeadlineTime] = useState<string>("");
+  const descriptionRef = useRef<HTMLTextAreaElement>(null);
 
   // Sync data
   useEffect(() => {
@@ -220,6 +221,14 @@ export const TaskDetailPanel = ({
       setIsDirty(hasChanges);
     }
   }, [formData, task]);
+
+  // Auto-resize description textarea when content changes
+  useEffect(() => {
+    if (descriptionRef.current) {
+      descriptionRef.current.style.height = "auto";
+      descriptionRef.current.style.height = `${Math.max(120, descriptionRef.current.scrollHeight)}px`;
+    }
+  }, [formData.description]);
 
   const handleChange = (
     field: keyof Task,
@@ -652,10 +661,16 @@ export const TaskDetailPanel = ({
                 </h3>
               </div>
               <Textarea
+                ref={descriptionRef}
                 value={formData.description || ""}
                 onChange={(e) => handleChange("description", e.target.value)}
-                className="min-h-[120px] w-full text-sm text-slate-700 leading-relaxed border border-slate-100 focus-visible:ring-1 focus:ring-slate-200 focus:border-slate-300 bg-slate-50/50 p-4 rounded-xl resize-y placeholder:text-slate-400"
+                className="min-h-[120px] w-full text-sm text-slate-700 leading-relaxed border border-slate-100 focus-visible:ring-1 focus:ring-slate-200 focus:border-slate-300 bg-slate-50/50 p-4 rounded-xl resize-none overflow-hidden placeholder:text-slate-400"
                 placeholder="Add more details about this task..."
+                onInput={(e) => {
+                  const target = e.target as HTMLTextAreaElement;
+                  target.style.height = "auto";
+                  target.style.height = `${Math.max(120, target.scrollHeight)}px`;
+                }}
               />
             </div>
           </div>

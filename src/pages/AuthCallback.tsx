@@ -1,19 +1,28 @@
 import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
+import { useAuth } from "@/context/AuthContext";
 import { authService } from "@/services/auth.service";
 import { syncService } from "@/services/sync.service";
 import { Loader2, CheckCircle, XCircle, Calendar } from "lucide-react";
 
-type CallbackState = "loading" | "initializing_sync" | "success" | "error";
+type CallbackState =
+  | "loading"
+  | "processing"
+  | "initializing_sync"
+  | "success"
+  | "error";
 
 const AuthCallback = () => {
   const navigate = useNavigate();
+  const { handleOAuthCallback } = useAuth();
   const [state, setState] = useState<CallbackState>("loading");
   const [errorMessage, setErrorMessage] = useState<string>("");
 
   useEffect(() => {
     const handleCallback = async () => {
       const params = new URLSearchParams(window.location.search);
+      const accessToken = params.get("accessToken");
+      const refreshToken = params.get("refreshToken");
       const userId = params.get("userId");
       const success = params.get("success");
       const error = params.get("error");
@@ -24,14 +33,29 @@ const AuthCallback = () => {
         return;
       }
 
-      if (success === "true" && userId) {
-        // Save userId to localStorage
-        authService.setUserId(userId);
+      if (success === "true") {
+        setState("processing");
+
+        // Handle JWT-based flow (new)
+        if (accessToken && refreshToken && userId) {
+          // Sử dụng handleOAuthCallback từ AuthContext
+          // Để update cả tokenManager VÀ React state
+          await handleOAuthCallback(accessToken, refreshToken, userId);
+        }
+        // Handle legacy userId-only flow
+        else if (userId) {
+          authService.setUserId(userId);
+        } else {
+          setState("error");
+          setErrorMessage("Invalid callback parameters");
+          return;
+        }
 
         // Initialize sync (creates Axis calendar automatically)
+        // Backend extracts userId from JWT token
         setState("initializing_sync");
         try {
-          await syncService.initialize(userId);
+          await syncService.initialize();
           setState("success");
         } catch (err) {
           // Sync initialization may fail if already initialized, but that's okay
@@ -42,6 +66,9 @@ const AuthCallback = () => {
         // Get redirect path from session storage
         const redirectPath = sessionStorage.getItem("authRedirect") || "/";
         sessionStorage.removeItem("authRedirect");
+
+        // Clean up URL params
+        window.history.replaceState({}, "", window.location.pathname);
 
         // Redirect after short delay
         setTimeout(() => {
@@ -54,7 +81,7 @@ const AuthCallback = () => {
     };
 
     handleCallback();
-  }, [navigate]);
+  }, [navigate, handleOAuthCallback]);
 
   return (
     <div className="min-h-screen flex items-center justify-center bg-gray-50">
@@ -66,6 +93,16 @@ const AuthCallback = () => {
               Processing authentication...
             </h2>
             <p className="mt-2 text-gray-600">Please wait a moment.</p>
+          </>
+        )}
+
+        {state === "processing" && (
+          <>
+            <Loader2 className="w-16 h-16 mx-auto text-blue-500 animate-spin" />
+            <h2 className="mt-4 text-xl font-semibold text-gray-900">
+              Setting up your account...
+            </h2>
+            <p className="mt-2 text-gray-600">Almost there!</p>
           </>
         )}
 
@@ -91,7 +128,8 @@ const AuthCallback = () => {
               Successfully connected!
             </h2>
             <p className="mt-2 text-gray-600">
-              Your Google Calendar is now synced with Axis. All your scheduled tasks will appear in your Axis calendar.
+              Your Google Calendar is now synced with Axis. All your scheduled
+              tasks will appear in your Axis calendar.
             </p>
             <p className="mt-2 text-sm text-gray-500">Redirecting...</p>
           </>
@@ -104,12 +142,20 @@ const AuthCallback = () => {
               Authentication failed
             </h2>
             <p className="mt-2 text-red-600">{errorMessage}</p>
-            <button
-              onClick={() => navigate("/", { replace: true })}
-              className="mt-4 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
-            >
-              Return to Dashboard
-            </button>
+            <div className="mt-4 space-x-2">
+              <button
+                onClick={() => navigate("/login", { replace: true })}
+                className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
+              >
+                Go to Login
+              </button>
+              <button
+                onClick={() => navigate("/", { replace: true })}
+                className="px-4 py-2 bg-gray-200 text-gray-700 rounded-lg hover:bg-gray-300 transition-colors"
+              >
+                Return to Dashboard
+              </button>
+            </div>
           </>
         )}
       </div>
