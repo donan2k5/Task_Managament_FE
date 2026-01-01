@@ -4,6 +4,7 @@ import {
   useState,
   useEffect,
   useCallback,
+  useRef,
   ReactNode,
 } from "react";
 import { authService } from "@/services/auth.service";
@@ -72,6 +73,9 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   const [isLoading, setIsLoading] = useState(true);
   const [isSyncLoading, setIsSyncLoading] = useState(false);
 
+  // Refs to prevent duplicate API calls
+  const hasCheckedStatus = useRef(false);
+
   // Derived state
   const userId = user?.id || null;
   // User is authenticated only if they have an access token
@@ -129,13 +133,17 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     return unsubscribe;
   }, []);
 
-  // Check Google & Sync status when user changes AND has valid auth
+  // Check Google & Sync status ONCE when user is authenticated
   useEffect(() => {
-    // Only check status if user has proper JWT authentication
-    if (userId && accessToken) {
+    // Only check status if user has proper JWT authentication AND hasn't checked yet
+    if (userId && accessToken && !hasCheckedStatus.current) {
+      hasCheckedStatus.current = true;
       checkGoogleStatus();
       checkSyncStatus();
-    } else {
+    }
+    // Reset flag when user logs out
+    if (!userId || !accessToken) {
+      hasCheckedStatus.current = false;
       setGoogleStatus(null);
       setSyncStatus(null);
     }

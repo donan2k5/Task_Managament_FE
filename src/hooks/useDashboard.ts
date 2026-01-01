@@ -10,38 +10,45 @@ export const useDashboard = () => {
   const [loading, setLoading] = useState(true);
   const { toast } = useToast();
   const hasFetched = useRef(false);
+  const isLoadingRef = useRef(false); // Prevent concurrent loads
 
   const loadData = useCallback(async () => {
+    // Prevent concurrent calls
+    if (isLoadingRef.current) return;
+
     // Only fetch if authenticated
     if (!authService.isAuthenticated()) {
       setLoading(false);
       return;
     }
 
+    // Skip if already fetched
+    if (hasFetched.current) {
+      setLoading(false);
+      return;
+    }
+
     try {
+      isLoadingRef.current = true;
       setLoading(true);
-      const [result] = await Promise.all([
-        dashboardService.getSummary(),
-        new Promise((resolve) => setTimeout(resolve, 0)),
-      ]);
+      const result = await dashboardService.getSummary();
       setData(result);
       hasFetched.current = true;
     } catch (error) {
       console.error("Dashboard load failed", error);
     } finally {
       setLoading(false);
+      isLoadingRef.current = false;
     }
   }, []);
 
-  // Initial fetch attempt
+  // Single effect: Initial fetch + token subscription
   useEffect(() => {
+    // Try initial load
     loadData();
-  }, [loadData]);
 
-  // Subscribe to token changes - re-fetch when token becomes available
-  useEffect(() => {
+    // Subscribe to token changes
     const unsubscribe = tokenManager.subscribe((token) => {
-      // If token just became available and we haven't fetched yet, fetch now
       if (token && !hasFetched.current) {
         loadData();
       }
