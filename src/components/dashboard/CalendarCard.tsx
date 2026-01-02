@@ -1,4 +1,4 @@
-import { useState, useMemo, useEffect } from "react";
+import { useState, useMemo, useEffect, forwardRef } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import {
   ChevronLeft,
@@ -286,8 +286,9 @@ const EventItem = ({ task }: { task: Task }) => {
   );
 };
 
-const EmptyState = () => (
+const EmptyState = forwardRef<HTMLDivElement>((_, ref) => (
   <motion.div
+    ref={ref}
     initial={{ opacity: 0 }}
     animate={{ opacity: 1 }}
     className="flex flex-col items-center justify-center text-center py-8 border-2 border-dashed border-slate-100 rounded-2xl bg-slate-50/30"
@@ -297,4 +298,5 @@ const EmptyState = () => (
       NO TASKS SCHEDULED
     </p>
   </motion.div>
-);
+));
+EmptyState.displayName = "EmptyState";
