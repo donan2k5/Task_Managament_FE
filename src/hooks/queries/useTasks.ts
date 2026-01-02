@@ -170,15 +170,24 @@ export const useTasksWithMutations = () => {
     (t) => !t.scheduledDate && t.status !== "done"
   );
 
+  // Calendar tasks - filter from existing tasks for a date range
+  // This is a no-op function for compatibility, tasks are already loaded
+  const fetchCalendarTasks = (_start: Date, _end: Date) => {
+    // Data is already available from the main query
+    // React Query handles caching automatically
+  };
+
   return {
     // Data
     tasks,
     scheduledTasks,
     unscheduledTasks,
+    calendarTasks: scheduledTasks, // Tasks with scheduledDate for calendar view
     loading: isLoading,
 
     // Actions
     fetchTasks: refetch,
+    fetchCalendarTasks,
     addTask: (data: Partial<Task>) => createMutation.mutateAsync(data),
     updateTask: (id: string, data: Partial<Task>) =>
       updateMutation.mutateAsync({ id, data }),
