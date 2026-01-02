@@ -1,7 +1,6 @@
 import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { useAuth } from "@/context/AuthContext";
-import { authService } from "@/services/auth.service";
 import { syncService } from "@/services/sync.service";
 import { Loader2, CheckCircle, XCircle, Calendar } from "lucide-react";
 
@@ -21,9 +20,6 @@ const AuthCallback = () => {
   useEffect(() => {
     const handleCallback = async () => {
       const params = new URLSearchParams(window.location.search);
-      const accessToken = params.get("accessToken");
-      const refreshToken = params.get("refreshToken");
-      const userId = params.get("userId");
       const success = params.get("success");
       const error = params.get("error");
 
@@ -36,23 +32,12 @@ const AuthCallback = () => {
       if (success === "true") {
         setState("processing");
 
-        // Handle JWT-based flow (new)
-        if (accessToken && refreshToken && userId) {
-          // Sử dụng handleOAuthCallback từ AuthContext
-          // Để update cả tokenManager VÀ React state
-          await handleOAuthCallback(accessToken, refreshToken, userId);
-        }
-        // Handle legacy userId-only flow
-        else if (userId) {
-          authService.setUserId(userId);
-        } else {
-          setState("error");
-          setErrorMessage("Invalid callback parameters");
-          return;
-        }
+        // Cookies are already set by server
+        // Just fetch user profile to update React state
+        await handleOAuthCallback();
 
         // Initialize sync (creates Axis calendar automatically)
-        // Backend extracts userId from JWT token
+        // Backend extracts userId from cookie
         setState("initializing_sync");
         try {
           await syncService.initialize();

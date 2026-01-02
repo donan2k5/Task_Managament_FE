@@ -1,7 +1,6 @@
 import api from "./api";
 import {
   AuthUser,
-  AuthResponse,
   LoginDto,
   RegisterDto,
   GoogleAuthStatus,
@@ -9,8 +8,7 @@ import {
   SetPasswordDto,
 } from "@/types/index";
 import {
-  tokenManager,
-  refreshTokenStorage,
+  authStateManager,
   userStorage,
   userIdStorage,
   clearAllAuthData,
@@ -18,38 +16,52 @@ import {
 
 const BASE_URL = import.meta.env.VITE_API_URL || "http://localhost:3000";
 
+// Cookie auth response (no tokens in body)
+interface CookieAuthResponse {
+  user: AuthUser;
+}
+
 export const authService = {
   // ==================== Email/Password Authentication ====================
 
   // Register new user
-  register: async (data: RegisterDto): Promise<AuthResponse> => {
-    const response = await api.post<AuthResponse>("/auth/register", data);
+  register: async (data: RegisterDto): Promise<CookieAuthResponse> => {
+    const response = await api.post<CookieAuthResponse>("/auth/register", data);
     authService.handleAuthSuccess(response.data);
     return response.data;
   },
 
   // Login with email/password
-  login: async (data: LoginDto): Promise<AuthResponse> => {
-    const response = await api.post<AuthResponse>("/auth/login", data);
+  login: async (data: LoginDto): Promise<CookieAuthResponse> => {
+    const response = await api.post<CookieAuthResponse>("/auth/login", data);
     authService.handleAuthSuccess(response.data);
     return response.data;
   },
 
   /**
-   * Refresh access token
-   * - Gọi khi app khởi động (có refresh token trong storage)
-   * - Gọi khi nhận 401 từ API
+   * Check auth status by calling /auth/me
+   * Cookies are sent automatically
    */
-  refreshAccessToken: async (): Promise<AuthResponse | null> => {
-    const refreshToken = refreshTokenStorage.get();
-    if (!refreshToken) return null;
-
+  checkAuth: async (): Promise<AuthUser | null> => {
     try {
-      // Use fetch directly to avoid interceptor loops
+      const response = await api.get<AuthUser>("/auth/me");
+      authService.handleAuthSuccess({ user: response.data });
+      return response.data;
+    } catch {
+      clearAllAuthData();
+      return null;
+    }
+  },
+
+  /**
+   * Refresh tokens (cookies handled by server)
+   */
+  refreshAccessToken: async (): Promise<CookieAuthResponse | null> => {
+    try {
       const response = await fetch(`${BASE_URL}/auth/refresh`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ refreshToken }),
+        credentials: "include", // Send cookies
       });
 
       if (!response.ok) {
@@ -57,7 +69,7 @@ export const authService = {
         return null;
       }
 
-      const data: AuthResponse = await response.json();
+      const data: CookieAuthResponse = await response.json();
       authService.handleAuthSuccess(data);
       return data;
     } catch (error) {
@@ -69,39 +81,21 @@ export const authService = {
 
   // Logout current device
   logout: async (): Promise<void> => {
-    const refreshToken = refreshTokenStorage.get();
-    const accessToken = tokenManager.getAccessToken();
-
-    if (refreshToken && accessToken) {
-      try {
-        await fetch(`${BASE_URL}/auth/logout`, {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-            Authorization: `Bearer ${accessToken}`,
-          },
-          body: JSON.stringify({ refreshToken }),
-        });
-      } catch (error) {
-        console.error("Logout API error:", error);
-      }
+    try {
+      await api.post("/auth/logout");
+    } catch (error) {
+      console.error("Logout API error:", error);
     }
-
     clearAllAuthData();
   },
 
   // Logout all devices
   logoutAll: async (): Promise<void> => {
-    const accessToken = tokenManager.getAccessToken();
-
-    if (accessToken) {
-      try {
-        await api.post("/auth/logout-all");
-      } catch (error) {
-        console.error("Logout all API error:", error);
-      }
+    try {
+      await api.post("/auth/logout-all");
+    } catch (error) {
+      console.error("Logout all API error:", error);
     }
-
     clearAllAuthData();
   },
 
@@ -152,36 +146,18 @@ export const authService = {
     return response.data;
   },
 
-  // ==================== Token Management ====================
+  // ==================== Auth State Management ====================
 
   /**
-   * Handle successful auth - store tokens properly
-   * - Access token: Memory only (via tokenManager)
-   * - Refresh token: localStorage
-   * - User data: localStorage (for persistence)
+   * Handle successful auth - store user data
+   * Tokens are in HTTP-only cookies (managed by server)
    */
-  handleAuthSuccess: (data: AuthResponse): void => {
-    // Access token -> memory only (KHÔNG lưu localStorage)
-    tokenManager.setAccessToken(data.accessToken);
-
-    // Refresh token -> localStorage
-    refreshTokenStorage.set(data.refreshToken);
-
+  handleAuthSuccess: (data: CookieAuthResponse): void => {
     // User data -> localStorage (for persistence across reloads)
     userStorage.set(data.user);
-
-    // Also set userId for backward compatibility
     userIdStorage.set(data.user.id);
-  },
-
-  // Get access token from memory
-  getAccessToken: (): string | null => {
-    return tokenManager.getAccessToken();
-  },
-
-  // Get refresh token from storage
-  getRefreshToken: (): string | null => {
-    return refreshTokenStorage.get();
+    // Update auth state
+    authStateManager.setAuthenticated(true);
   },
 
   // Get stored user data
@@ -194,19 +170,9 @@ export const authService = {
     clearAllAuthData();
   },
 
-  // Check if user has refresh token (can potentially authenticate)
-  hasRefreshToken: (): boolean => {
-    return refreshTokenStorage.has();
-  },
-
-  // Check if user has access token in memory
-  hasAccessToken: (): boolean => {
-    return tokenManager.hasAccessToken();
-  },
-
-  // Check if user is authenticated (has access token)
+  // Check if user is authenticated (based on stored user data)
   isAuthenticated: (): boolean => {
-    return tokenManager.hasAccessToken();
+    return authStateManager.isAuthenticated();
   },
 
   // ==================== Legacy Methods (for backward compatibility) ====================
@@ -231,4 +197,10 @@ export const authService = {
   refreshToken: async (): Promise<TokenRefreshResult> => {
     return authService.refreshGoogleToken();
   },
+
+  // Legacy compatibility - these do nothing now with cookie auth
+  getAccessToken: (): string | null => null,
+  getRefreshToken: (): string | null => null,
+  hasRefreshToken: (): boolean => false,
+  hasAccessToken: (): boolean => authStateManager.isAuthenticated(),
 };

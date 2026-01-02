@@ -5,8 +5,8 @@ import { GoalsCard } from "@/components/dashboard/GoalsCard";
 import { ProjectsCard } from "@/components/dashboard/ProjectsCard";
 import { CalendarCard } from "@/components/dashboard/CalendarCard";
 import { useDashboard } from "@/hooks/useDashboard";
+import { DashboardSkeleton } from "@/components/skeletons";
 import { motion } from "framer-motion";
-import { Loader2 } from "lucide-react";
 
 // --- ANIMATION VARIANTS ---
 const containerVariants = {
@@ -39,17 +39,12 @@ const Index = () => {
     day: "numeric",
   });
 
-  // Loading State đẹp hơn
+  // Loading State with Skeleton
   if (loading)
     return (
-      <div className="flex h-screen items-center justify-center bg-slate-50">
-        <div className="flex flex-col items-center gap-3">
-          <Loader2 className="w-10 h-10 text-violet-600 animate-spin" />
-          <span className="text-slate-400 text-sm font-medium animate-pulse">
-            Gathering your data...
-          </span>
-        </div>
-      </div>
+      <DashboardLayout>
+        <DashboardSkeleton />
+      </DashboardLayout>
     );
 
   if (!data)

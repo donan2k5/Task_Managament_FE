@@ -14,6 +14,7 @@ import {
   ChevronDown,
   Trash2,
 } from "lucide-react";
+import { ProjectGridSkeleton } from "@/components/skeletons";
 import DashboardLayout from "@/components/layout/DashboardLayout";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -240,8 +241,14 @@ const Projects = () => {
   if (loading)
     return (
       <DashboardLayout>
-        <div className="p-10 flex items-center justify-center">
-          <Loader2 className="w-8 h-8 animate-spin text-primary" />
+        <div className="p-8 max-w-7xl mx-auto">
+          <div className="mb-8 flex items-start justify-between gap-4 flex-wrap">
+            <div>
+              <h1 className="text-3xl font-bold text-foreground mb-1">Projects</h1>
+              <p className="text-muted-foreground">Track progress across all your projects</p>
+            </div>
+          </div>
+          <ProjectGridSkeleton count={5} />
         </div>
       </DashboardLayout>
     );
