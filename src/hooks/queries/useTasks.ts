@@ -1,4 +1,5 @@
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+
 import { Task } from "@/types/index";
 import { taskService } from "@/services/task.service";
 import { useAuth } from "@/context/AuthContext";
@@ -95,7 +96,7 @@ export const useUpdateTask = () => {
 
   return useMutation({
     mutationFn: ({ id, data }: { id: string; data: Partial<Task> }) => {
-      const { _id, createdAt, updatedAt, __v, ...cleanData } = data as any;
+      const { _id, createdAt, updatedAt, __v, ...cleanData } = data as Task & { __v?: number };
       return taskService.update(id, cleanData);
     },
     onMutate: async ({ id, data }) => {

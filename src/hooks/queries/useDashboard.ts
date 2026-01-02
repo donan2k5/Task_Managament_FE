@@ -10,26 +10,19 @@ export const dashboardKeys = {
 };
 
 // Dashboard Summary Type
+import { Task, Project, HeaderStats, ScheduleEvent } from "@/types/index";
+
+// Dashboard Summary Type
 export interface DashboardSummary {
-  totalTasks: number;
-  completedTasks: number;
-  todayTasks: number;
-  overdueTasks: number;
-  projects: Array<{
-    id: string;
+  tasks: Task[];
+  overdueTasks: Task[];
+  projects: Project[];
+  upcomingEvents: ScheduleEvent[];
+  headerStats: HeaderStats;
+  user: {
     name: string;
-    tasksCount: number;
-    progress: number;
-    color: string;
-    icon: string;
-  }>;
-  recentTasks: Array<{
-    id: string;
-    title: string;
     status: string;
-    project: string;
-    scheduledDate?: string;
-  }>;
+  };
 }
 
 // Query: Get dashboard summary

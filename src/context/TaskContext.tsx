@@ -17,7 +17,7 @@ interface TaskContextType {
   isDeleting: boolean;
 }
 
-const TaskContext = createContext<TaskContextType | null>(null);
+export const TaskContext = createContext<TaskContextType | null>(null);
 
 export const TaskProvider = ({ children }: { children: ReactNode }) => {
   const taskState = useTasksWithMutations();

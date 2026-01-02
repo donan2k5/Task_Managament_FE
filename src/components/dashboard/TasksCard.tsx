@@ -1,10 +1,11 @@
 import { useState, useMemo, forwardRef, useCallback, useEffect, useRef } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { MoreHorizontal, Clock, CheckCircle2, Circle, Loader2 } from "lucide-react";
-import { format } from "date-fns";
+import { MoreHorizontal, Clock, CheckCircle2, Circle, Loader2, Sparkles } from "lucide-react";
+import { format, isSameDay, startOfDay } from "date-fns";
 import { Task } from "@/types/index";
 import { taskService } from "@/services/task.service";
 import { toast } from "sonner";
+import { cn } from "@/lib/utils";
 
 interface TasksCardProps {
   tasks: Task[];
@@ -14,44 +15,31 @@ interface TasksCardProps {
 export const TasksCard = ({ tasks: initialTasks, onTaskUpdated }: TasksCardProps) => {
   const [localTasks, setLocalTasks] = useState<Task[]>(initialTasks);
   const [loadingTaskIds, setLoadingTaskIds] = useState<Set<string>>(new Set());
-
-  // Track locally modified task IDs to preserve during sync
   const modifiedTaskIds = useRef<Set<string>>(new Set());
 
-  // Smart sync: preserve locally modified tasks, update others
   useEffect(() => {
     setLocalTasks((prevLocal) => {
-      // If no local modifications, just use new data
       if (modifiedTaskIds.current.size === 0) {
         return initialTasks;
       }
-
-      // Merge: keep locally modified tasks, use new data for others
       const newTaskMap = new Map(initialTasks.map(t => [t._id, t]));
       const localModifiedMap = new Map(
         prevLocal.filter(t => modifiedTaskIds.current.has(t._id)).map(t => [t._id, t])
       );
-
-      // Combine: prioritize local modifications
       const merged = initialTasks.map(t =>
         localModifiedMap.has(t._id) ? localModifiedMap.get(t._id)! : t
       );
-
-      // Add any locally modified tasks that aren't in new data
       prevLocal.forEach(t => {
         if (modifiedTaskIds.current.has(t._id) && !newTaskMap.has(t._id)) {
           merged.push(t);
         }
       });
-
       return merged;
     });
   }, [initialTasks]);
 
-  // Logic lọc và phân loại task
   const { todoTasks, todayAccomplished } = useMemo(() => {
     const todayStr = new Date().toDateString();
-
     const todo = localTasks.filter((t) => {
       if (t.completed) return false;
       const isToday = t.scheduledDate
@@ -60,10 +48,6 @@ export const TasksCard = ({ tasks: initialTasks, onTaskUpdated }: TasksCardProps
       const isCritical = t.isUrgent && t.isImportant;
       return isCritical || isToday;
     });
-
-    // Today's accomplishments: completed tasks that were either:
-    // 1. Scheduled for today, or
-    // 2. Updated today (likely completed today)
     const accomplished = localTasks.filter((t) => {
       if (!t.completed) return false;
       const scheduledToday = t.scheduledDate
@@ -74,25 +58,17 @@ export const TasksCard = ({ tasks: initialTasks, onTaskUpdated }: TasksCardProps
         : false;
       return scheduledToday || updatedToday;
     });
-
     return { todoTasks: todo, todayAccomplished: accomplished };
   }, [localTasks]);
 
   const toggleTask = useCallback(async (taskId: string) => {
     const task = localTasks.find((t) => t._id === taskId);
     if (!task) return;
-
-    // Mark as locally modified to preserve during sync
     modifiedTaskIds.current.add(taskId);
-
-    // Add to loading state
     setLoadingTaskIds((prev) => new Set(prev).add(taskId));
-
-    // Optimistic update with updatedAt set to now
     const newCompleted = !task.completed;
     const newStatus = newCompleted ? "done" : "todo";
     const now = new Date().toISOString();
-
     setLocalTasks((prev) =>
       prev.map((t) =>
         t._id === taskId
@@ -100,29 +76,20 @@ export const TasksCard = ({ tasks: initialTasks, onTaskUpdated }: TasksCardProps
           : t
       )
     );
-
     try {
       const updatedTask = await taskService.update(taskId, {
         completed: newCompleted,
         status: newStatus,
       });
-
-      // Update local state with API response
       setLocalTasks((prev) =>
         prev.map((t) => (t._id === taskId ? { ...t, ...updatedTask } : t))
       );
-
-      // Notify parent if callback provided
       onTaskUpdated?.(updatedTask);
-
       toast.success(newCompleted ? "Task completed!" : "Task restored");
-
-      // Clear modification flag after successful sync (delay to handle any parent re-renders)
       setTimeout(() => {
         modifiedTaskIds.current.delete(taskId);
       }, 2000);
     } catch (error) {
-      // Rollback on error
       setLocalTasks((prev) =>
         prev.map((t) =>
           t._id === taskId ? { ...t, completed: task.completed, status: task.status } : t
@@ -130,7 +97,6 @@ export const TasksCard = ({ tasks: initialTasks, onTaskUpdated }: TasksCardProps
       );
       modifiedTaskIds.current.delete(taskId);
       toast.error("Failed to update task");
-      console.error("Error updating task:", error);
     } finally {
       setLoadingTaskIds((prev) => {
         const newSet = new Set(prev);
@@ -144,25 +110,26 @@ export const TasksCard = ({ tasks: initialTasks, onTaskUpdated }: TasksCardProps
     <motion.div
       initial={{ opacity: 0, y: 10 }}
       animate={{ opacity: 1, y: 0 }}
-      className="bg-white rounded-2xl p-6 border border-slate-100 shadow-sm flex flex-col gap-4 max-h-[600px]" // Thêm max-h để kiểm soát chiều cao
+      className="bg-white rounded-[24px] p-6 border border-slate-100/60 shadow-[0_4px_20px_-12px_rgba(0,0,0,0.05)] flex flex-col gap-5 h-full max-h-[600px]"
     >
-      {/* HEADER */}
-      <div className="flex items-center justify-between sticky top-0 bg-white pb-2 z-10">
-        <div className="flex items-center gap-2">
-          <h3 className="text-xs font-bold text-slate-400 uppercase tracking-widest">
-            Today's Focus
-          </h3>
-          <span className="bg-indigo-50 text-indigo-600 text-xs font-bold px-2 py-0.5 rounded-full">
-            {todoTasks.length}
-          </span>
+      <div className="flex items-center justify-between sticky top-0 bg-white z-10">
+        <div className="flex items-center gap-3">
+            <div className="w-8 h-8 rounded-full bg-indigo-50 flex items-center justify-center text-indigo-600">
+                <Sparkles size={16} />
+            </div>
+            <div>
+                 <h3 className="text-sm font-bold text-slate-800">Today's Focus</h3>
+                 <p className="text-[11px] text-slate-400 font-medium">
+                    {todoTasks.length} tasks remaining
+                 </p>
+            </div>
         </div>
-        <button className="text-slate-300 hover:text-slate-600">
-          <MoreHorizontal size={20} />
+        <button className="w-8 h-8 flex items-center justify-center rounded-full hover:bg-slate-50 text-slate-300 hover:text-slate-600 transition-colors">
+          <MoreHorizontal size={18} />
         </button>
       </div>
 
-      {/* TODO LIST: Thêm overflow-y-auto để cuộn nếu quá nhiều task */}
-      <div className="flex flex-col gap-3 overflow-y-auto pr-1 custom-scrollbar">
+      <div className="flex flex-col gap-2 overflow-y-auto pr-2 custom-scrollbar flex-1 -mx-2 px-2">
         <AnimatePresence mode="popLayout" initial={false}>
           {todoTasks.length > 0 ? (
             todoTasks.map((task) => (
@@ -179,28 +146,26 @@ export const TasksCard = ({ tasks: initialTasks, onTaskUpdated }: TasksCardProps
         </AnimatePresence>
       </div>
 
-      {/* TODAY'S ACCOMPLISHMENTS */}
       {todayAccomplished.length > 0 && (
-        <div className="border-t border-slate-100 pt-4 mt-2">
-          <div className="flex items-center gap-2 mb-3">
-            <h4 className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">
-              Accomplished Today
-            </h4>
-            <span className="bg-emerald-50 text-emerald-600 text-[10px] font-bold px-1.5 py-0.5 rounded-full">
-              {todayAccomplished.length}
-            </span>
-          </div>
-          <div className="flex flex-col gap-2">
+        <div className="border-t border-slate-100 pt-4">
+          <h4 className="text-[11px] font-bold text-slate-400 uppercase tracking-wider mb-3 px-1">
+            Completed Today
+          </h4>
+          <div className="flex flex-col gap-1">
             {todayAccomplished.map((task) => (
-              <div
+              <motion.div
+                initial={{ opacity: 0 }}
+                animate={{ opacity: 1 }}
                 key={task._id}
-                className="flex items-center gap-3 px-2 py-1.5 rounded-lg bg-emerald-50/50"
+                className="flex items-center gap-3 px-3 py-2 rounded-lg hover:bg-emerald-50/30 group transition-colors"
               >
-                <CheckCircle2 size={16} className="text-emerald-500 shrink-0" />
-                <span className="text-sm text-slate-600 truncate">
+                <div className="p-0.5 rounded-full bg-emerald-100/50">
+                    <CheckCircle2 size={14} className="text-emerald-500 shrink-0" />
+                </div>
+                <span className="text-sm text-slate-500 line-through decoration-slate-300 truncate group-hover:text-slate-600 transition-colors">
                   {task.title}
                 </span>
-              </div>
+              </motion.div>
             ))}
           </div>
         </div>
@@ -209,61 +174,62 @@ export const TasksCard = ({ tasks: initialTasks, onTaskUpdated }: TasksCardProps
   );
 };
 
-// --- Sub-components ---
-
 const TaskItem = forwardRef<HTMLDivElement, { task: Task; onToggle: () => void; isLoading?: boolean }>(
   ({ task, onToggle, isLoading }, ref) => {
     const isCritical = task.isUrgent && task.isImportant;
+    const hasTime = task.scheduledDate && !isSameDay(new Date(task.scheduledDate), startOfDay(new Date(task.scheduledDate))); 
+    // Logic: if scheduledDate is basically 00:00:00, we consider it "all day" so no time showed. 
+    // Wait, ISO string from startOfDay might be local 00:00 converted to UTC. 
+    // We should check if the formatted time satisfies a specific condition or just rely on the new add logic.
+    // For safety, let's format it. If it's "00:00", don't show.
+    const timeStr = task.scheduledDate ? format(new Date(task.scheduledDate), "HH:mm") : "";
+    const showTime = timeStr && timeStr !== "00:00";
 
     return (
       <motion.div
         ref={ref}
         layout
-        initial={{ opacity: 0, x: -10 }}
-        animate={{ opacity: 1, x: 0 }}
+        initial={{ opacity: 0, scale: 0.98 }}
+        animate={{ opacity: 1, scale: 1 }}
         exit={{ opacity: 0, scale: 0.95 }}
-        className="group flex items-start gap-3 p-3 rounded-xl hover:bg-slate-50 border border-slate-50 hover:border-slate-200 transition-all cursor-pointer bg-white shadow-sm"
+        className="group flex items-center gap-3 p-3.5 rounded-[16px] hover:bg-slate-50 border border-transparent hover:border-slate-100 transition-all cursor-pointer bg-white/50 hover:shadow-sm"
       >
         <button
           onClick={onToggle}
           disabled={isLoading}
-          className="mt-1 text-slate-300 hover:text-indigo-600 transition-colors disabled:opacity-50"
+          className="shrink-0 text-slate-300 hover:text-indigo-600 transition-colors disabled:opacity-50"
         >
           {isLoading ? (
-            <Loader2 size={20} className="animate-spin text-indigo-500" />
+            <Loader2 size={22} className="animate-spin text-indigo-500" />
           ) : (
-            <Circle size={20} strokeWidth={2} />
+            <Circle size={22} strokeWidth={1.5} />
           )}
         </button>
 
-        <div className="flex-1 min-w-0">
-          <div className="flex justify-between items-start gap-2">
-            <h4 className="text-[15px] font-semibold text-slate-800 leading-tight truncate group-hover:text-indigo-700">
+        <div className="flex-1 min-w-0 flex flex-col gap-0.5">
+            <h4 className={cn(
+                "text-[15px] font-medium leading-tight truncate transition-colors",
+                isCritical ? "text-slate-900" : "text-slate-700 group-hover:text-slate-900"
+            )}>
               {task.title}
             </h4>
-            {task.scheduledDate && (
-              <div className="flex items-center gap-1 text-[10px] font-bold text-slate-400 whitespace-nowrap bg-slate-50 px-1.5 py-0.5 rounded">
-                <Clock size={10} /> {format(new Date(task.scheduledDate), "HH:mm")}
-              </div>
-            )}
-          </div>
-
-          <div className="flex items-center gap-2 mt-1.5">
-            <span
-              className={`text-[9px] font-black px-1.5 py-0.5 rounded uppercase ${
-                isCritical
-                  ? "bg-rose-50 text-rose-600"
-                  : "bg-indigo-50 text-indigo-600"
-              }`}
-            >
-              {isCritical ? "Priority" : "Today"}
-            </span>
-            <span className="text-slate-300 text-xs px-1">/</span>
-            <span className="text-[11px] text-slate-400 font-medium truncate">
-              {task.project}
-            </span>
-          </div>
+            <div className="flex items-center gap-2">
+                {isCritical && (
+                     <span className="text-[10px] font-bold text-rose-500 bg-rose-50 px-1.5 py-0.5 rounded-md">Priority</span>
+                )}
+                {task.project && (
+                    <span className="text-[11px] text-slate-400 font-medium truncate">
+                        #{task.project}
+                    </span>
+                )}
+            </div>
         </div>
+
+        {showTime && (
+            <div className="shrink-0 text-[11px] font-semibold text-slate-400 bg-slate-50 px-2 py-1 rounded-lg group-hover:bg-white group-hover:shadow-sm transition-all border border-transparent group-hover:border-slate-100">
+                {timeStr}
+            </div>
+        )}
       </motion.div>
     );
   }
@@ -275,11 +241,16 @@ const EmptyState = () => (
   <motion.div
     initial={{ opacity: 0 }}
     animate={{ opacity: 1 }}
-    className="text-center py-10"
+    className="flex flex-col items-center justify-center py-12 px-4"
   >
-    <div className="text-3xl mb-2">☕</div>
-    <p className="text-xs font-medium text-slate-400 uppercase tracking-widest">
+    <div className="w-16 h-16 bg-slate-50 rounded-full flex items-center justify-center mb-3">
+        <Sparkles className="w-8 h-8 text-slate-300" />
+    </div>
+    <p className="text-sm font-semibold text-slate-600">
       All caught up!
+    </p>
+    <p className="text-xs text-slate-400 text-center max-w-[150px] mt-1">
+        Enjoy your free time or plan for tomorrow.
     </p>
   </motion.div>
 );

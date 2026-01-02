@@ -109,6 +109,12 @@ export const authService = {
     }
   },
 
+  // Update user profile
+  updateProfile: async (data: { name: string; annotation?: string }): Promise<AuthUser> => {
+    const response = await api.patch<AuthUser>("/users/profile", data);
+    return response.data;
+  },
+
   // Set password for Google-only users
   setPassword: async (data: SetPasswordDto): Promise<void> => {
     await api.post("/auth/set-password", data);

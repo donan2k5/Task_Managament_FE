@@ -35,6 +35,7 @@ interface AuthContextType {
   // Auth Actions
   login: (email: string, password: string) => Promise<void>;
   register: (name: string, email: string, password: string) => Promise<void>;
+  updateProfile: (data: { name: string; annotation?: string }) => Promise<void>;
   loginWithGoogle: () => void;
   logout: () => Promise<void>;
   refreshAuth: () => Promise<boolean>;
@@ -144,6 +145,12 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     },
     []
   );
+
+  const updateProfile = useCallback(async (data: { name: string; annotation?: string }) => {
+    const updatedUser = await authService.updateProfile(data);
+    setUser((prev) => (prev ? { ...prev, ...updatedUser } : updatedUser));
+    userStorage.set({ ...userStorage.get(), ...updatedUser } as AuthUser);
+  }, []);
 
   const loginWithGoogle = useCallback(() => {
     // Store current path for redirect after auth
@@ -289,6 +296,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     // Auth Actions
     login,
     register,
+    updateProfile,
     loginWithGoogle,
     logout,
     refreshAuth,

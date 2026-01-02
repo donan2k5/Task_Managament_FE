@@ -6,23 +6,22 @@ export interface Task {
   project?: string;
   description?: string;
 
+  // Date assignment (for Today/Next 7 Days filters) - date only, no time
+  assignedDate?: string; // ISO String (e.g., "2024-12-20") - which day task belongs to
+
   // Scheduling (for calendar events) - both are full Date/DateTime ISO strings
   scheduledDate?: string; // Start date/time ISO String (e.g., "2024-12-20T14:30:00Z")
   scheduledEndDate?: string; // End date/time ISO String (e.g., "2024-12-20T15:30:00Z")
 
-  // Deadline (separate concept - user-set due date, NOT from Google Calendar)
-  deadline?: string; // ISO String - When the task is DUE (independent of calendar event)
+  // Deadline (separate concept - user-set due date)
+  deadline?: string; // ISO String - When the task is DUE
 
   isUrgent: boolean;
   isImportant: boolean;
   completed: boolean;
-  status: "backlog" | "todo" | "done";
+  status: "todo" | "done";
   createdAt?: string;
   updatedAt?: string;
-
-  // Google sync fields
-  googleEventId?: string;
-  lastSyncedAt?: string;
 }
 
 export interface Project {
@@ -74,6 +73,7 @@ export interface AuthUser {
   email: string;
   name: string;
   avatar?: string;
+  annotation?: string;
   authMethods: ("local" | "google")[];
   googleConnected: boolean;
 }

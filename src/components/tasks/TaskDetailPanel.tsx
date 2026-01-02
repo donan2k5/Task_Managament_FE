@@ -179,7 +179,7 @@ export const TaskDetailPanel = ({
 
   // Sync data
   useEffect(() => {
-    const { _id, createdAt, updatedAt, __v, ...allowedFields } = task as any;
+    const { _id, createdAt, updatedAt, __v, ...allowedFields } = task as Task & { __v?: number };
     setFormData(allowedFields);
 
     if (task.scheduledDate) {

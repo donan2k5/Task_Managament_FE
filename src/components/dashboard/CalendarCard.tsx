@@ -70,7 +70,7 @@ export const CalendarCard = () => {
 
   useEffect(() => {
     fetchCalendarTasks(range.start, range.end);
-  }, [range.start.toISOString(), fetchCalendarTasks]);
+  }, [range.start.toISOString(), range.end.toISOString(), fetchCalendarTasks]);
 
   // --- DERIVED STATE ---
   const weekDays = useMemo(
@@ -217,7 +217,7 @@ export const CalendarCard = () => {
 
 // --- SUB COMPONENTS ---
 
-const EventItem = ({ task }: { task: Task }) => {
+const EventItem = forwardRef<HTMLDivElement, { task: Task }>(({ task }, ref) => {
   const startTime = useMemo(() => {
     if (!task.scheduledDate) return "";
     return formatTime(task.scheduledDate);
@@ -230,6 +230,7 @@ const EventItem = ({ task }: { task: Task }) => {
 
   return (
     <motion.div
+      ref={ref}
       layout
       initial={{ opacity: 0, x: -10 }}
       animate={{ opacity: 1, x: 0 }}
@@ -284,7 +285,8 @@ const EventItem = ({ task }: { task: Task }) => {
       </div>
     </motion.div>
   );
-};
+});
+EventItem.displayName = "EventItem";
 
 const EmptyState = forwardRef<HTMLDivElement>((_, ref) => (
   <motion.div

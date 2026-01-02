@@ -11,6 +11,7 @@ import {
 } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
+import { getProjectIcon } from "@/lib/projectIcons";
 
 interface ProjectsCardProps {
   projects: Project[];
@@ -75,46 +76,49 @@ export const ProjectsCard = ({ projects, onAddProject }: ProjectsCardProps) => {
           </motion.button>
 
           {/* LIST: Projects */}
-          {projects.map((project, index) => (
-            <motion.div
-              key={project.id || index}
-              layout
-              initial={{ opacity: 0, scale: 0.9 }}
-              animate={{ opacity: 1, scale: 1 }}
-              transition={{ delay: index * 0.1 }}
-              whileHover={{
-                y: -4,
-                boxShadow: "0 10px 15px -3px rgb(0 0 0 / 0.1)",
-              }}
-              whileTap={{ scale: 0.98 }}
-              className="flex flex-col gap-3 p-4 rounded-2xl border border-slate-100 bg-white shadow-sm hover:border-indigo-100 cursor-pointer transition-colors"
-            >
-              <div className="flex justify-between items-start">
-                <div
-                  className="w-10 h-10 rounded-xl flex items-center justify-center text-xl border border-slate-100"
-                  style={{
-                    color: project.color,
-                    backgroundColor: `${project.color}15`,
-                  }}
-                >
-                  {project.icon || "📁"}
+          {projects.map((project, index) => {
+            const IconComponent = getProjectIcon(project.icon);
+            return (
+              <motion.div
+                key={project.id || index}
+                layout
+                initial={{ opacity: 0, scale: 0.9 }}
+                animate={{ opacity: 1, scale: 1 }}
+                transition={{ delay: index * 0.1 }}
+                whileHover={{
+                  y: -4,
+                  boxShadow: "0 10px 15px -3px rgb(0 0 0 / 0.1)",
+                }}
+                whileTap={{ scale: 0.98 }}
+                className="flex flex-col gap-3 p-4 rounded-2xl border border-slate-100 bg-white shadow-sm hover:border-indigo-100 cursor-pointer transition-colors"
+              >
+                <div className="flex justify-between items-start">
+                  <div
+                    className="w-10 h-10 rounded-xl flex items-center justify-center border border-slate-100"
+                    style={{
+                      color: project.color || "#6366f1",
+                      backgroundColor: `${project.color || "#6366f1"}15`,
+                    }}
+                  >
+                    <IconComponent className="w-5 h-5" />
+                  </div>
+                  <div className="w-8 h-8 rounded-full border-2 border-slate-50 flex items-center justify-center text-[9px] font-bold text-slate-400">
+                    {project.progress || 0}%
+                  </div>
                 </div>
-                <div className="w-8 h-8 rounded-full border-2 border-slate-50 flex items-center justify-center text-[9px] font-bold text-slate-400">
-                  {project.progress || 0}%
-                </div>
-              </div>
 
-              <div className="min-w-0">
-                <h4 className="text-sm font-bold text-slate-900 truncate mb-0.5">
-                  {project.name}
-                </h4>
-                <p className="text-[10px] text-slate-500 font-medium truncate">
-                  {project.tasksCount || 0} tasks • {project.teammates || 1}{" "}
-                  members
-                </p>
-              </div>
-            </motion.div>
-          ))}
+                <div className="min-w-0">
+                  <h4 className="text-sm font-bold text-slate-900 truncate mb-0.5">
+                    {project.name}
+                  </h4>
+                  <p className="text-[10px] text-slate-500 font-medium truncate">
+                    {project.tasksCount || 0} tasks • {project.teammates || 1}{" "}
+                    members
+                  </p>
+                </div>
+              </motion.div>
+            );
+          })}
         </div>
       </motion.div>
 

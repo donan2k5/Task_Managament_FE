@@ -6,17 +6,21 @@ import { BrowserRouter, Routes, Route } from "react-router-dom";
 import { TaskProvider } from "@/context/TaskContext";
 import { AuthProvider } from "@/context/AuthContext";
 import ProtectedRoute from "@/components/auth/ProtectedRoute";
+import { KeyboardShortcutsProvider } from "@/hooks/useKeyboardShortcuts";
 
 // Pages
 import Index from "./pages/Index";
-import Projects from "./pages/Projects";
 import NotFound from "./pages/NotFound";
-import Tasks from "./pages/Tasks";
+
+import TasksPage from "./pages/TasksPage";
 import Calendar from "./pages/Calendar";
 import Reports from "./pages/Reports";
 import AuthCallback from "./pages/AuthCallback";
 import Login from "./pages/Login";
 import Register from "./pages/Register";
+import Pomodoro from "./pages/Pomodoro";
+import Habits from "./pages/Habits";
+import Settings from "./pages/Settings";
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -37,11 +41,12 @@ const App = () => (
           <Toaster />
           <Sonner />
           <BrowserRouter>
-            <Routes>
-              {/* Public Routes */}
-              <Route path="/login" element={<Login />} />
-              <Route path="/register" element={<Register />} />
-              <Route path="/auth/callback" element={<AuthCallback />} />
+            <KeyboardShortcutsProvider>
+              <Routes>
+                {/* Public Routes */}
+                <Route path="/login" element={<Login />} />
+                <Route path="/register" element={<Register />} />
+                <Route path="/auth/callback" element={<AuthCallback />} />
 
               {/* Protected Routes */}
               <Route
@@ -56,10 +61,19 @@ const App = () => (
                 path="/tasks"
                 element={
                   <ProtectedRoute>
-                    <Tasks />
+                    <TasksPage />
                   </ProtectedRoute>
                 }
               />
+              <Route
+                path="/matrix"
+                element={
+                  <ProtectedRoute>
+                    <TasksPage initialTab="plan" />
+                  </ProtectedRoute>
+                }
+              />
+
               <Route
                 path="/calendar"
                 element={
@@ -68,14 +82,7 @@ const App = () => (
                   </ProtectedRoute>
                 }
               />
-              <Route
-                path="/projects"
-                element={
-                  <ProtectedRoute>
-                    <Projects />
-                  </ProtectedRoute>
-                }
-              />
+
               <Route
                 path="/analytics"
                 element={
@@ -96,7 +103,23 @@ const App = () => (
                 path="/settings"
                 element={
                   <ProtectedRoute>
-                    <Index />
+                    <Settings />
+                  </ProtectedRoute>
+                }
+              />
+              <Route
+                path="/pomodoro"
+                element={
+                  <ProtectedRoute>
+                    <Pomodoro />
+                  </ProtectedRoute>
+                }
+              />
+              <Route
+                path="/habits"
+                element={
+                  <ProtectedRoute>
+                    <Habits />
                   </ProtectedRoute>
                 }
               />
@@ -104,6 +127,7 @@ const App = () => (
               {/* Catch-all */}
               <Route path="*" element={<NotFound />} />
             </Routes>
+            </KeyboardShortcutsProvider>
           </BrowserRouter>
         </TooltipProvider>
       </TaskProvider>

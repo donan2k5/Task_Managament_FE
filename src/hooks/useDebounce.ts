@@ -22,6 +22,7 @@ export function useDebounce<T>(value: T, delay: number = 300): T {
 /**
  * Debounce a callback function
  */
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
 export function useDebouncedCallback<T extends (...args: any[]) => any>(
   callback: T,
   delay: number = 300

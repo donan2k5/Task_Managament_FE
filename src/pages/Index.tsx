@@ -1,31 +1,31 @@
 import DashboardLayout from "@/components/layout/DashboardLayout";
 import { DashboardHeader } from "@/components/dashboard/DashboardHeader";
 import { TasksCard } from "@/components/dashboard/TasksCard";
-import { GoalsCard } from "@/components/dashboard/GoalsCard";
+import { OverdueTasksCard } from "@/components/dashboard/OverdueTasksCard";
 import { ProjectsCard } from "@/components/dashboard/ProjectsCard";
 import { CalendarCard } from "@/components/dashboard/CalendarCard";
 import { useDashboard } from "@/hooks/useDashboard";
 import { DashboardSkeleton } from "@/components/skeletons";
-import { motion } from "framer-motion";
+import { motion, Variants } from "framer-motion";
 
 // --- ANIMATION VARIANTS ---
-const containerVariants = {
+const containerVariants: Variants = {
   hidden: { opacity: 0 },
   visible: {
     opacity: 1,
     transition: {
-      staggerChildren: 0.15, // Mỗi phần tử hiện cách nhau 0.15s
+      staggerChildren: 0.08,
       when: "beforeChildren",
     },
   },
 };
 
-const itemVariants = {
-  hidden: { opacity: 0, y: 30 },
+const itemVariants: Variants = {
+  hidden: { opacity: 0, y: 15 },
   visible: {
     opacity: 1,
     y: 0,
-    transition: { type: "spring", stiffness: 260, damping: 20 },
+    transition: { type: "tween", duration: 0.2, ease: "easeOut" },
   },
 };
 
@@ -55,7 +55,7 @@ const Index = () => {
   return (
     <DashboardLayout>
       <motion.div
-        className="p-6 max-w-7xl mx-auto"
+        className="p-4 w-full"
         variants={containerVariants}
         initial="hidden"
         animate="visible"
@@ -69,24 +69,23 @@ const Index = () => {
           />
         </motion.div>
 
-        <div className="grid grid-cols-1 lg:grid-cols-5 gap-6">
+        <div className="grid grid-cols-1 lg:grid-cols-5 gap-4 md:gap-6">
           {/* LEFT COLUMN */}
-          <div className="lg:col-span-3 space-y-6">
+          <div className="lg:col-span-3 space-y-4 md:space-y-6">
             <motion.div variants={itemVariants}>
               <TasksCard tasks={data.tasks} />
             </motion.div>
             <motion.div variants={itemVariants}>
-              <GoalsCard goals={data.goals} />
+              <OverdueTasksCard tasks={data.overdueTasks || []} />
             </motion.div>
           </div>
 
           {/* RIGHT COLUMN */}
-          <div className="lg:col-span-2 space-y-6">
+          <div className="lg:col-span-2 space-y-4 md:space-y-6">
             <motion.div variants={itemVariants}>
-              <CalendarCard events={data.upcomingEvents} />
+              <CalendarCard />
             </motion.div>
             <motion.div variants={itemVariants}>
-              {/* Truyền props onAddProject */}
               <ProjectsCard
                 projects={data.projects}
                 onAddProject={addProject}

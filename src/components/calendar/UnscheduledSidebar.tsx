@@ -130,12 +130,13 @@ export const UnscheduledSidebar = ({
             initial={{ opacity: 0, x: -20 }}
             animate={{ opacity: 1, x: 0 }}
             exit={{ opacity: 0, x: -20 }}
+            transition={{ type: "tween", duration: 0.15 }}
             onClick={() => onToggleExpanded(true)}
-            className="absolute left-0 top-20 z-30 flex items-center gap-2 bg-white border border-l-0 border-slate-200 rounded-r-xl px-3 py-3 shadow-md hover:shadow-lg hover:bg-slate-50 transition-all group"
+            className="absolute left-0 top-16 md:top-20 z-30 flex items-center gap-1.5 md:gap-2 bg-white border border-l-0 border-slate-200 rounded-r-xl px-2 md:px-3 py-2 md:py-3 shadow-md hover:shadow-lg hover:bg-slate-50 transition-all group"
           >
             <Inbox className="w-4 h-4 text-slate-500 group-hover:text-blue-600 transition-colors" />
             {tasks.length > 0 && (
-              <span className="text-xs font-bold bg-blue-100 text-blue-700 px-2 py-0.5 rounded-full min-w-[20px] text-center">
+              <span className="text-[10px] md:text-xs font-bold bg-blue-100 text-blue-700 px-1.5 md:px-2 py-0.5 rounded-full min-w-[18px] md:min-w-[20px] text-center">
                 {tasks.length}
               </span>
             )}
@@ -156,11 +157,11 @@ export const UnscheduledSidebar = ({
                 opacity: isDragging && isDraggingOutside ? 0.3 : 1,
               }}
               exit={{ x: "-100%", opacity: 0 }}
-              transition={{ type: "spring", damping: 25, stiffness: 300 }}
+              transition={{ type: "tween", duration: 0.2, ease: "easeOut" }}
               onDragLeave={handleDragLeaveDrawer}
               onDragEnter={handleDragEnterDrawer}
               className={cn(
-                "absolute left-0 top-0 bottom-0 w-72 bg-white border-r border-slate-200 shadow-xl z-30 flex flex-col",
+                "fixed lg:absolute left-0 top-0 bottom-0 w-72 bg-white border-r border-slate-200 shadow-xl z-40 lg:z-30 flex flex-col",
                 isDragging && isDraggingOutside && "pointer-events-none"
               )}
             >

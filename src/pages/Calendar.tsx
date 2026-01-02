@@ -6,15 +6,12 @@ import { WeekView } from "@/components/calendar/WeekView";
 import { CalendarHeader } from "@/components/calendar/CalendarHeader";
 import { UnscheduledSidebar } from "@/components/calendar/UnscheduledSidebar";
 import { TaskDetailPopover } from "@/components/calendar/TaskDetailPopover";
-import { GoogleCalendarSettings } from "@/components/google";
 import { useTaskContext } from "@/context/TaskContext";
 import { useProjects } from "@/hooks/useProjects";
 import { TaskDetailPanel } from "@/components/tasks/TaskDetailPanel";
 import { startOfWeek, addDays, setHours, setMinutes } from "date-fns";
-import { AnimatePresence, motion } from "framer-motion";
+import { AnimatePresence } from "framer-motion";
 import { Task } from "@/types";
-import { X } from "lucide-react";
-import { Button } from "@/components/ui/button";
 
 export default function CalendarPage() {
   const [currentDate, setCurrentDate] = useState(new Date());
@@ -23,7 +20,6 @@ export default function CalendarPage() {
   const [editingTask, setEditingTask] = useState<Task | null>(null);
   const [externalDragTask, setExternalDragTask] = useState<Task | null>(null);
   const [isSidebarExpanded, setIsSidebarExpanded] = useState(false);
-  const [showSyncSettings, setShowSyncSettings] = useState(false);
 
   const { scheduledTasks, unscheduledTasks, updateTask, addTask, deleteTask } =
     useTaskContext();
@@ -77,7 +73,6 @@ export default function CalendarPage() {
         position: { x: event.clientX + 10, y: event.clientY - 20 },
       });
     } else {
-      // Fallback to center of screen if no event
       setPopoverTask({
         task,
         position: { x: window.innerWidth / 2 - 160, y: window.innerHeight / 3 },
@@ -94,11 +89,12 @@ export default function CalendarPage() {
     if (!externalDragTask) return;
 
     const startDate = setMinutes(setHours(date, hour), 0);
-    const endDate = new Date(startDate.getTime() + 60 * 60 * 1000); // +1 hour
+    const endDate = new Date(startDate.getTime() + 60 * 60 * 1000);
 
     updateTask(externalDragTask._id, {
       scheduledDate: startDate.toISOString(),
       scheduledEndDate: endDate.toISOString(),
+      assignedDate: startDate.toISOString().split('T')[0],
       status: "todo",
     });
     setExternalDragTask(null);
@@ -106,33 +102,36 @@ export default function CalendarPage() {
 
   return (
     <DashboardLayout>
-      {/* Full-width calendar container with relative positioning for sidebar overlay */}
       <div className="relative h-[calc(100vh-4rem)] overflow-hidden bg-slate-100">
-        {/* Collapsible Unscheduled Tasks Sidebar (Floating Inbox) */}
-        <UnscheduledSidebar
-          tasks={unscheduledTasks}
-          onDragStart={handleExternalDragStart}
-          onDragEnd={() => setExternalDragTask(null)}
-          onTaskClick={(task) => handleTaskClick(task)}
-          draggingTaskId={externalDragTask?._id}
-          isExpanded={isSidebarExpanded}
-          onToggleExpanded={setIsSidebarExpanded}
-        />
+        <div className={`${isSidebarExpanded ? 'block' : 'hidden lg:block'}`}>
+          <UnscheduledSidebar
+            tasks={unscheduledTasks}
+            onDragStart={handleExternalDragStart}
+            onDragEnd={() => setExternalDragTask(null)}
+            onTaskClick={(task) => handleTaskClick(task)}
+            draggingTaskId={externalDragTask?._id}
+            isExpanded={isSidebarExpanded}
+            onToggleExpanded={setIsSidebarExpanded}
+          />
+        </div>
 
-        {/* Main Calendar Area - Shifts right when sidebar is expanded */}
+        {isSidebarExpanded && (
+          <div
+            className="fixed inset-0 bg-black/20 z-30 lg:hidden"
+            onClick={() => setIsSidebarExpanded(false)}
+          />
+        )}
+
         <div
-          className="h-full flex flex-col p-4 transition-all duration-300 ease-in-out"
-          style={{ paddingLeft: isSidebarExpanded ? '296px' : '8px' }}
+          className="h-full flex flex-col p-2 md:p-4 transition-all duration-300 ease-in-out"
+          style={{ paddingLeft: isSidebarExpanded ? '296px' : undefined }}
         >
           <div className="h-full flex flex-col bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden">
-            {/* Header */}
             <CalendarHeader
               currentDate={currentDate}
               onDateChange={setCurrentDate}
-              onOpenSyncSettings={() => setShowSyncSettings(true)}
             />
 
-            {/* Calendar Grid */}
             <div className="flex-1 overflow-hidden">
               <WeekView
                 currentDate={currentDate}
@@ -149,7 +148,6 @@ export default function CalendarPage() {
         </div>
       </div>
 
-      {/* Task Detail Popover (Quick View) */}
       <AnimatePresence>
         {popoverTask && (
           <TaskDetailPopover
@@ -170,7 +168,6 @@ export default function CalendarPage() {
         )}
       </AnimatePresence>
 
-      {/* Task Detail Panel (Full Edit) */}
       <AnimatePresence>
         {editingTask && (
           <TaskDetailPanel
@@ -183,39 +180,6 @@ export default function CalendarPage() {
             }}
             projects={projects}
           />
-        )}
-      </AnimatePresence>
-
-      {/* Sync Settings Modal */}
-      <AnimatePresence>
-        {showSyncSettings && (
-          <>
-            <motion.div
-              initial={{ opacity: 0 }}
-              animate={{ opacity: 1 }}
-              exit={{ opacity: 0 }}
-              className="fixed inset-0 bg-black/30 backdrop-blur-sm z-[80]"
-              onClick={() => setShowSyncSettings(false)}
-            />
-            <motion.div
-              initial={{ opacity: 0, scale: 0.95, y: 20 }}
-              animate={{ opacity: 1, scale: 1, y: 0 }}
-              exit={{ opacity: 0, scale: 0.95, y: 20 }}
-              className="fixed inset-0 z-[90] flex items-center justify-center p-4"
-            >
-              <div className="relative bg-white rounded-2xl shadow-2xl max-w-lg w-full max-h-[90vh] overflow-y-auto">
-                <Button
-                  variant="ghost"
-                  size="icon"
-                  className="absolute right-3 top-3 z-10 h-8 w-8 text-slate-400 hover:text-slate-600"
-                  onClick={() => setShowSyncSettings(false)}
-                >
-                  <X className="w-4 h-4" />
-                </Button>
-                <GoogleCalendarSettings />
-              </div>
-            </motion.div>
-          </>
         )}
       </AnimatePresence>
     </DashboardLayout>
