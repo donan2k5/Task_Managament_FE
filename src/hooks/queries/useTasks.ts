@@ -82,6 +82,8 @@ export const useCreateTask = () => {
     onSettled: () => {
       // Always refetch after error or success
       queryClient.invalidateQueries({ queryKey: taskKeys.all });
+      // Also invalidate dashboard to show updated task counts
+      queryClient.invalidateQueries({ queryKey: ["dashboard"] });
     },
   });
 };
@@ -120,6 +122,8 @@ export const useUpdateTask = () => {
     },
     onSettled: () => {
       queryClient.invalidateQueries({ queryKey: taskKeys.all });
+      // Also invalidate dashboard to show updated task counts
+      queryClient.invalidateQueries({ queryKey: ["dashboard"] });
     },
   });
 };
@@ -153,6 +157,8 @@ export const useDeleteTask = () => {
     },
     onSettled: () => {
       queryClient.invalidateQueries({ queryKey: taskKeys.all });
+      // Also invalidate dashboard to show updated task counts
+      queryClient.invalidateQueries({ queryKey: ["dashboard"] });
     },
   });
 };
