@@ -1,5 +1,5 @@
 import { createContext, useContext, ReactNode } from "react";
-import { useTasks } from "@/hooks/useTasks";
+import { useTasksWithMutations } from "@/hooks/queries/useTasks";
 import { Task } from "@/types";
 
 interface TaskContextType {
@@ -8,18 +8,41 @@ interface TaskContextType {
   unscheduledTasks: Task[];
   loading: boolean;
   fetchTasks: () => Promise<void>;
-  addTask: (taskData: Partial<Task>) => Promise<void>;
-  updateTask: (id: string, updates: Partial<Task>) => Promise<void>;
-  deleteTask: (id: string) => Promise<void>;
+  addTask: (taskData: Partial<Task>) => Promise<Task>;
+  updateTask: (id: string, updates: Partial<Task>) => Promise<Task>;
+  deleteTask: (id: string) => Promise<Task>;
+  // New mutation states for UX
+  isCreating: boolean;
+  isUpdating: boolean;
+  isDeleting: boolean;
 }
 
 const TaskContext = createContext<TaskContextType | null>(null);
 
 export const TaskProvider = ({ children }: { children: ReactNode }) => {
-  const taskState = useTasks();
+  const taskState = useTasksWithMutations();
+
+  // Wrap refetch to match the old signature
+  const fetchTasks = async () => {
+    await taskState.fetchTasks();
+  };
+
+  const value: TaskContextType = {
+    tasks: taskState.tasks,
+    scheduledTasks: taskState.scheduledTasks,
+    unscheduledTasks: taskState.unscheduledTasks,
+    loading: taskState.loading,
+    fetchTasks,
+    addTask: taskState.addTask,
+    updateTask: taskState.updateTask,
+    deleteTask: taskState.deleteTask,
+    isCreating: taskState.isCreating,
+    isUpdating: taskState.isUpdating,
+    isDeleting: taskState.isDeleting,
+  };
 
   return (
-    <TaskContext.Provider value={taskState}>{children}</TaskContext.Provider>
+    <TaskContext.Provider value={value}>{children}</TaskContext.Provider>
   );
 };
 

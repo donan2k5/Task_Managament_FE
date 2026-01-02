@@ -1,11 +1,5 @@
 import axios, { AxiosError, InternalAxiosRequestConfig } from "axios";
-import {
-  tokenManager,
-  refreshTokenStorage,
-  userStorage,
-  userIdStorage,
-  clearAllAuthData,
-} from "./tokenManager";
+import { userStorage, userIdStorage, clearAllAuthData } from "./tokenManager";
 
 const BASE_URL = import.meta.env.VITE_API_URL || "http://localhost:3000";
 
@@ -13,16 +7,16 @@ const BASE_URL = import.meta.env.VITE_API_URL || "http://localhost:3000";
 let isRefreshing = false;
 let hasRedirected = false;
 let failedQueue: Array<{
-  resolve: (token: string) => void;
+  resolve: () => void;
   reject: (error: Error) => void;
 }> = [];
 
-const processQueue = (error: Error | null, token: string | null = null) => {
+const processQueue = (error: Error | null) => {
   failedQueue.forEach((promise) => {
     if (error) {
       promise.reject(error);
-    } else if (token) {
-      promise.resolve(token);
+    } else {
+      promise.resolve();
     }
   });
   failedQueue = [];
@@ -45,7 +39,7 @@ const clearAuthAndRedirect = () => {
   }
 };
 
-// Reset redirect flag when page loads (in case user manually navigates)
+// Reset redirect flag when page loads
 if (typeof window !== "undefined") {
   window.addEventListener("load", () => {
     hasRedirected = false;
@@ -57,21 +51,10 @@ const api = axios.create({
   headers: {
     "Content-Type": "application/json",
   },
+  withCredentials: true, // Send cookies automatically
 });
 
-// Request interceptor to add auth header
-api.interceptors.request.use((config: InternalAxiosRequestConfig) => {
-  // Lấy access token từ memory (không phải localStorage)
-  const accessToken = tokenManager.getAccessToken();
-
-  // Add Authorization header if token exists
-  // Backend sẽ extract userId từ JWT token, không cần gửi userId riêng
-  if (accessToken) {
-    config.headers.Authorization = `Bearer ${accessToken}`;
-  }
-
-  return config;
-});
+// No request interceptor needed - cookies are sent automatically with withCredentials
 
 // Response interceptor to handle token refresh
 api.interceptors.response.use(
@@ -91,20 +74,11 @@ api.interceptors.response.use(
       return Promise.reject(error);
     }
 
-    // Check if we have a refresh token
-    const refreshToken = refreshTokenStorage.get();
-    if (!refreshToken) {
-      // No refresh token - clear auth and redirect (but don't retry)
-      clearAuthAndRedirect();
-      return Promise.reject(error);
-    }
-
     if (isRefreshing) {
       // If already refreshing, queue this request
       return new Promise((resolve, reject) => {
         failedQueue.push({
-          resolve: (token: string) => {
-            originalRequest.headers.Authorization = `Bearer ${token}`;
+          resolve: () => {
             resolve(api(originalRequest));
           },
           reject: (err: Error) => {
@@ -118,11 +92,11 @@ api.interceptors.response.use(
     isRefreshing = true;
 
     try {
-      // Refresh the token using fetch to avoid interceptor loops
+      // Refresh token using fetch with credentials (cookies)
       const response = await fetch(`${BASE_URL}/auth/refresh`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ refreshToken }),
+        credentials: "include", // Send cookies
       });
 
       if (!response.ok) {
@@ -131,29 +105,20 @@ api.interceptors.response.use(
 
       const data = await response.json();
 
-      // Store new tokens properly
-      // Access token -> memory only
-      tokenManager.setAccessToken(data.accessToken);
-
-      // Refresh token -> localStorage
-      refreshTokenStorage.set(data.refreshToken);
-
-      // User data -> localStorage
+      // Only store user data (tokens are in HTTP-only cookies)
       if (data.user) {
         userStorage.set(data.user);
         userIdStorage.set(data.user.id);
       }
 
-      // Update authorization header
-      originalRequest.headers.Authorization = `Bearer ${data.accessToken}`;
-
       // Process queued requests
-      processQueue(null, data.accessToken);
+      processQueue(null);
 
+      // Retry original request (cookies already updated by server)
       return api(originalRequest);
     } catch (refreshError) {
       // Refresh failed - clear auth and redirect
-      processQueue(new Error("Token refresh failed"), null);
+      processQueue(new Error("Token refresh failed"));
       clearAuthAndRedirect();
       return Promise.reject(refreshError);
     } finally {

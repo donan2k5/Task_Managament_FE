@@ -18,7 +18,16 @@ import AuthCallback from "./pages/AuthCallback";
 import Login from "./pages/Login";
 import Register from "./pages/Register";
 
-const queryClient = new QueryClient();
+const queryClient = new QueryClient({
+  defaultOptions: {
+    queries: {
+      staleTime: 5 * 60 * 1000, // 5 minutes
+      gcTime: 10 * 60 * 1000, // 10 minutes (garbage collection)
+      retry: 1,
+      refetchOnWindowFocus: true,
+    },
+  },
+});
 
 const App = () => (
   <QueryClientProvider client={queryClient}>

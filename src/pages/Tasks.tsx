@@ -15,11 +15,11 @@ import {
   History,
   X,
   RefreshCcw,
-  Loader2,
   Flag,
   Clock,
   Hash,
 } from "lucide-react";
+import { TaskMatrixSkeleton } from "@/components/skeletons";
 import { cn } from "@/lib/utils";
 import { Task } from "@/types/index";
 import { useTaskContext } from "@/context/TaskContext";
@@ -765,14 +765,17 @@ const Tasks = () => {
 
   if (loading)
     return (
-      <div className="flex h-screen items-center justify-center">
-        <div className="flex flex-col items-center gap-2">
-          <Loader2 className="w-8 h-8 text-violet-600 animate-spin" />
-          <span className="text-slate-400 text-sm font-medium">
-            Loading workspace...
-          </span>
+      <DashboardLayout>
+        <div className="p-6 max-w-[1600px] mx-auto h-[calc(100vh-2rem)] flex flex-col overflow-hidden">
+          <div className="flex items-center justify-between mb-5 shrink-0">
+            <div>
+              <h1 className="text-2xl font-bold text-slate-900">Task Matrix</h1>
+              <p className="text-sm text-slate-500">Eisenhower Method</p>
+            </div>
+          </div>
+          <TaskMatrixSkeleton />
         </div>
-      </div>
+      </DashboardLayout>
     );
 
   return (

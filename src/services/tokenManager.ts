@@ -1,78 +1,73 @@
 /**
- * Token Manager - Quản lý access token trong memory (không lưu localStorage)
+ * Auth State Manager - Quản lý auth state với HTTP-only cookies
  *
- * Best Practice:
- * - Access token: Lưu trong memory, an toàn hơn với XSS
- * - Refresh token: Lưu trong localStorage (hoặc httpOnly cookie nếu BE hỗ trợ)
- * - Khi reload page: Dùng refresh token để lấy access token mới
+ * Cookie-based Auth:
+ * - Access token: HTTP-only cookie (server-side, không thể access từ JS)
+ * - Refresh token: HTTP-only cookie (server-side)
+ * - User data: localStorage (cho UX persistence)
+ *
+ * Khi reload page: Browser tự gửi cookies, không cần refresh manual
  */
 
-type TokenChangeCallback = (token: string | null) => void;
+type AuthStateCallback = (isAuthenticated: boolean) => void;
 
-class TokenManager {
-  private accessToken: string | null = null;
-  private subscribers: Set<TokenChangeCallback> = new Set();
+class AuthStateManager {
+  private _isAuthenticated: boolean = false;
+  private subscribers: Set<AuthStateCallback> = new Set();
 
-  // Lấy access token từ memory
-  getAccessToken(): string | null {
-    return this.accessToken;
+  // Check if user is authenticated
+  isAuthenticated(): boolean {
+    return this._isAuthenticated;
   }
 
-  // Set access token vào memory
-  setAccessToken(token: string | null): void {
-    this.accessToken = token;
+  // Set auth state
+  setAuthenticated(value: boolean): void {
+    this._isAuthenticated = value;
     this.notifySubscribers();
   }
 
-  // Clear access token
-  clearAccessToken(): void {
-    this.accessToken = null;
-    this.notifySubscribers();
-  }
-
-  // Subscribe to token changes
-  subscribe(callback: TokenChangeCallback): () => void {
+  // Subscribe to auth state changes
+  subscribe(callback: AuthStateCallback): () => void {
     this.subscribers.add(callback);
     return () => {
       this.subscribers.delete(callback);
     };
   }
 
-  // Notify all subscribers when token changes
+  // Notify all subscribers when auth state changes
   private notifySubscribers(): void {
     this.subscribers.forEach((callback) => {
-      callback(this.accessToken);
+      callback(this._isAuthenticated);
     });
-  }
-
-  // Check if user has access token
-  hasAccessToken(): boolean {
-    return !!this.accessToken;
   }
 }
 
 // Singleton instance
-export const tokenManager = new TokenManager();
+export const authStateManager = new AuthStateManager();
 
-// Refresh token management (localStorage - acceptable per guide)
-const REFRESH_TOKEN_KEY = "refreshToken";
+// Legacy tokenManager compatibility (deprecated, use authStateManager)
+export const tokenManager = {
+  getAccessToken: () => null, // Tokens are in HTTP-only cookies now
+  setAccessToken: (_token: string | null) => {
+    // No-op, tokens handled by cookies
+  },
+  clearAccessToken: () => {
+    // No-op
+  },
+  hasAccessToken: () => authStateManager.isAuthenticated(),
+  subscribe: (callback: (token: string | null) => void) => {
+    return authStateManager.subscribe((isAuth) => {
+      callback(isAuth ? "cookie-auth" : null);
+    });
+  },
+};
 
+// refreshTokenStorage deprecated - tokens are in HTTP-only cookies
 export const refreshTokenStorage = {
-  get: (): string | null => {
-    return localStorage.getItem(REFRESH_TOKEN_KEY);
-  },
-
-  set: (token: string): void => {
-    localStorage.setItem(REFRESH_TOKEN_KEY, token);
-  },
-
-  clear: (): void => {
-    localStorage.removeItem(REFRESH_TOKEN_KEY);
-  },
-
-  has: (): boolean => {
-    return !!localStorage.getItem(REFRESH_TOKEN_KEY);
-  },
+  get: (): string | null => null,
+  set: (_token: string): void => {},
+  clear: (): void => {},
+  has: (): boolean => false,
 };
 
 // User storage (localStorage - for persistence)
@@ -115,12 +110,12 @@ export const userIdStorage = {
   },
 };
 
-// Clear all auth data
+// Clear all auth data (localStorage only - cookies cleared by server)
 export const clearAllAuthData = (): void => {
-  tokenManager.clearAccessToken();
-  refreshTokenStorage.clear();
+  authStateManager.setAuthenticated(false);
   userStorage.clear();
   userIdStorage.clear();
-  // Also clear legacy accessToken if exists
+  // Clear legacy data if exists
   localStorage.removeItem("accessToken");
+  localStorage.removeItem("refreshToken");
 };

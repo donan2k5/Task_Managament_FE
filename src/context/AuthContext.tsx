@@ -9,12 +9,9 @@ import {
 } from "react";
 import { authService } from "@/services/auth.service";
 import { syncService } from "@/services/sync.service";
-import { tokenManager, userStorage } from "@/services/tokenManager";
+import { authStateManager, userStorage } from "@/services/tokenManager";
 import {
   AuthUser,
-  AuthResponse,
-  LoginDto,
-  RegisterDto,
   GoogleAuthStatus,
   SyncStatus,
 } from "@/types/index";
@@ -22,7 +19,6 @@ import {
 interface AuthContextType {
   // User & Auth State
   user: AuthUser | null;
-  accessToken: string | null;
   isAuthenticated: boolean;
   isLoading: boolean;
 
@@ -43,12 +39,8 @@ interface AuthContextType {
   logout: () => Promise<void>;
   refreshAuth: () => Promise<boolean>;
 
-  // OAuth Callback Handler
-  handleOAuthCallback: (
-    accessToken: string,
-    refreshToken: string,
-    userId: string
-  ) => Promise<void>;
+  // OAuth Callback Handler (cookies already set by server)
+  handleOAuthCallback: () => Promise<void>;
 
   // Google Actions
   connectGoogle: () => void;
@@ -65,7 +57,6 @@ const AuthContext = createContext<AuthContextType | null>(null);
 
 export const AuthProvider = ({ children }: { children: ReactNode }) => {
   const [user, setUser] = useState<AuthUser | null>(null);
-  const [accessToken, setAccessToken] = useState<string | null>(null);
   const [googleStatus, setGoogleStatus] = useState<GoogleAuthStatus | null>(
     null
   );
@@ -78,45 +69,40 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
 
   // Derived state
   const userId = user?.id || null;
-  // User is authenticated only if they have an access token
-  const isAuthenticated = !!accessToken && !!user;
+  // User is authenticated if we have user data (cookies are sent automatically)
+  const isAuthenticated = !!user;
 
   /**
-   * App Initialization Flow (theo best practice):
-   * 1. Check có refreshToken trong storage không
-   * 2. Nếu KHÔNG có: User chưa login
-   * 3. Nếu CÓ: Gọi POST /auth/refresh để lấy accessToken mới
-   *    - Nếu thành công: user đã login, lưu accessToken vào memory
-   *    - Nếu thất bại: refresh token hết hạn, clear & redirect login
+   * App Initialization Flow (Cookie-based Auth):
+   * 1. Check if we have user data in localStorage (for immediate UX)
+   * 2. Call /auth/me to verify session is still valid
+   *    - Browser automatically sends HTTP-only cookies
+   *    - If valid: update user data
+   *    - If invalid (401): clear local data, user needs to login
    */
   useEffect(() => {
     const initAuth = async () => {
-      // Check có refresh token không (access token KHÔNG lưu localStorage)
-      const hasRefreshToken = authService.hasRefreshToken();
-
-      if (!hasRefreshToken) {
-        // User chưa login hoặc đã logout
-        // Clear legacy data nếu có
-        authService.clearAuth();
-        setIsLoading(false);
-        return;
+      // Try to get stored user for immediate UX
+      const storedUser = userStorage.get<AuthUser>();
+      if (storedUser) {
+        setUser(storedUser);
       }
 
-      // Có refresh token -> gọi refresh để lấy access token mới
+      // Verify session with server (cookies sent automatically)
       try {
-        const response = await authService.refreshAccessToken();
-
-        if (response) {
-          // Refresh thành công -> user đã login
-          setAccessToken(response.accessToken);
-          setUser(response.user);
+        const currentUser = await authService.checkAuth();
+        if (currentUser) {
+          setUser(currentUser);
+          authStateManager.setAuthenticated(true);
         } else {
-          // Refresh thất bại -> token hết hạn
-          authService.clearAuth();
+          // Session invalid - clear local data
+          setUser(null);
+          authStateManager.setAuthenticated(false);
         }
       } catch {
-        // Lỗi refresh -> clear auth
-        authService.clearAuth();
+        // Auth check failed - clear local data
+        setUser(null);
+        authStateManager.setAuthenticated(false);
       }
 
       setIsLoading(false);
@@ -125,44 +111,36 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     initAuth();
   }, []);
 
-  // Subscribe to token changes from tokenManager
-  useEffect(() => {
-    const unsubscribe = tokenManager.subscribe((token) => {
-      setAccessToken(token);
-    });
-    return unsubscribe;
-  }, []);
-
   // Check Google & Sync status ONCE when user is authenticated
   useEffect(() => {
-    // Only check status if user has proper JWT authentication AND hasn't checked yet
-    if (userId && accessToken && !hasCheckedStatus.current) {
+    // Only check status if user is authenticated AND hasn't checked yet
+    if (userId && !hasCheckedStatus.current) {
       hasCheckedStatus.current = true;
       checkGoogleStatus();
       checkSyncStatus();
     }
     // Reset flag when user logs out
-    if (!userId || !accessToken) {
+    if (!userId) {
       hasCheckedStatus.current = false;
       setGoogleStatus(null);
       setSyncStatus(null);
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [userId, accessToken]);
+  }, [userId]);
 
   // ==================== Auth Actions ====================
 
   const login = useCallback(async (email: string, password: string) => {
-    const data: LoginDto = { email, password };
-    const response = await authService.login(data);
-    handleAuthSuccess(response);
+    const response = await authService.login({ email, password });
+    setUser(response.user);
+    authStateManager.setAuthenticated(true);
   }, []);
 
   const register = useCallback(
     async (name: string, email: string, password: string) => {
-      const data: RegisterDto = { name, email, password };
-      const response = await authService.register(data);
-      handleAuthSuccess(response);
+      const response = await authService.register({ name, email, password });
+      setUser(response.user);
+      authStateManager.setAuthenticated(true);
     },
     []
   );
@@ -176,77 +154,45 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   const logout = useCallback(async () => {
     await authService.logout();
     setUser(null);
-    setAccessToken(null);
     setGoogleStatus(null);
     setSyncStatus(null);
+    authStateManager.setAuthenticated(false);
   }, []);
 
   const refreshAuth = useCallback(async (): Promise<boolean> => {
     try {
       const response = await authService.refreshAccessToken();
       if (response) {
-        handleAuthSuccess(response);
+        setUser(response.user);
+        authStateManager.setAuthenticated(true);
         return true;
       }
       return false;
     } catch {
       setUser(null);
-      setAccessToken(null);
+      authStateManager.setAuthenticated(false);
       return false;
     }
   }, []);
 
-  const handleAuthSuccess = (response: AuthResponse) => {
-    // Access token được lưu vào tokenManager (memory) bởi authService.handleAuthSuccess
-    // Chỉ cần update React state
-    setAccessToken(response.accessToken);
-    setUser(response.user);
-  };
-
   /**
-   * Handle OAuth callback - được gọi từ AuthCallback page
-   * Cập nhật cả tokenManager và React state
+   * Handle OAuth callback - called from AuthCallback page
+   * Cookies are already set by server, just need to fetch user profile
    */
-  const handleOAuthCallback = useCallback(
-    async (
-      callbackAccessToken: string,
-      callbackRefreshToken: string,
-      callbackUserId: string
-    ) => {
-      // Tạo user object tạm thời
-      const tempUser: AuthUser = {
-        id: callbackUserId,
-        email: "",
-        name: "",
-        authMethods: ["google"],
-        googleConnected: true,
-      };
-
-      // Lưu tokens vào storage/memory
-      authService.handleAuthSuccess({
-        accessToken: callbackAccessToken,
-        refreshToken: callbackRefreshToken,
-        user: tempUser,
-      });
-
-      // Update React state ngay lập tức
-      setAccessToken(callbackAccessToken);
-      setUser(tempUser);
-
-      // Fetch full user profile
-      try {
-        const profile = await authService.getProfile();
-        if (profile) {
-          setUser(profile);
-          // Cập nhật user trong storage
-          userStorage.set(profile);
-        }
-      } catch {
-        // Profile fetch failed, dùng temp user
+  const handleOAuthCallback = useCallback(async () => {
+    try {
+      // Fetch user profile (cookies already set by server)
+      const profile = await authService.getProfile();
+      if (profile) {
+        setUser(profile);
+        userStorage.set(profile);
+        authStateManager.setAuthenticated(true);
       }
-    },
-    []
-  );
+    } catch {
+      // Profile fetch failed
+      console.error("Failed to fetch user profile after OAuth");
+    }
+  }, []);
 
   // ==================== Google Actions ====================
 
@@ -256,8 +202,8 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   }, []);
 
   const checkGoogleStatus = useCallback(async () => {
-    // Only check if user is authenticated (has access token)
-    if (!accessToken) return;
+    // Only check if user is authenticated
+    if (!user) return;
 
     try {
       const status = await authService.checkGoogleStatus();
@@ -266,10 +212,10 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       console.error("Failed to check Google status:", error);
       setGoogleStatus({ isConnected: false });
     }
-  }, [accessToken]);
+  }, [user]);
 
   const disconnectGoogle = useCallback(async () => {
-    if (!accessToken) return;
+    if (!user) return;
 
     try {
       await authService.disconnectGoogle();
@@ -279,12 +225,12 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       console.error("Failed to disconnect Google:", error);
       throw error;
     }
-  }, [accessToken]);
+  }, [user]);
 
   // ==================== Sync Actions ====================
 
   const checkSyncStatus = useCallback(async () => {
-    if (!accessToken) return;
+    if (!user) return;
 
     try {
       const status = await syncService.getStatus();
@@ -293,10 +239,10 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       console.error("Failed to check sync status:", error);
       setSyncStatus({ enabled: false, calendarId: null, webhookActive: false });
     }
-  }, [accessToken]);
+  }, [user]);
 
   const initializeSync = useCallback(async (): Promise<boolean> => {
-    if (!accessToken) return false;
+    if (!user) return false;
 
     setIsSyncLoading(true);
     try {
@@ -309,10 +255,10 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     } finally {
       setIsSyncLoading(false);
     }
-  }, [accessToken, checkSyncStatus]);
+  }, [user, checkSyncStatus]);
 
   const disconnectSync = useCallback(async () => {
-    if (!accessToken) return;
+    if (!user) return;
 
     setIsSyncLoading(true);
     try {
@@ -324,12 +270,11 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     } finally {
       setIsSyncLoading(false);
     }
-  }, [accessToken]);
+  }, [user]);
 
   const value: AuthContextType = {
     // User & Auth State
     user,
-    accessToken,
     isAuthenticated,
     isLoading,
     userId,
